@@ -6,7 +6,7 @@
 
 # Author:     Fanglin Liu
 # Email:      flliu315@163.com
-# Date:       2025-03-05
+# Date:       2026-03-11
 # --------------------------------------------
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
@@ -38,7 +38,6 @@ sqrt(2)
 5%/%2 # Integer Division
 5%%2 # Modulus
 
-
 # Logical Operations
 
 !TRUE # "!" is Logical NOT
@@ -52,7 +51,7 @@ TRUE | FALSE # “|” is for Logical OR
 # save the script in a given folder: Desktop/myclass
  
 ##################################################
-########## II. R data objects and operation ######
+########## II. R objects and operation ###########
 ##################################################
 
 # 01- R Variables
@@ -61,14 +60,35 @@ TRUE | FALSE # “|” is for Logical OR
 
 # Assign a string using "=", "<-" or "->" operator
 var1 = "Hello Geeks"
-print(var1)
+print(var1) # input objects into R environment
 
 x <- 5 #  assigned x value of 5
 y <- 7 # assigned y value of 7
 
 9 -> z
 
-# Rules for Naming Variables in R
+# naming objects and operating on them
+# using char, number and underscore to name objects
+# the names are case sensitive 
+
+o <- 10  # assign/set o to 10
+O <-  5  # assign/set O to  5
+
+o * O  
+o * 0  # Note: O differs from 0
+o / O
+O / 0
+
+length(o) # Object shape
+dim(o)
+
+mode(o) # Object type
+
+# Avoid using spaces inside variables 
+
+# naming tea_pot instead of tea pot
+
+
 
 var1 <- 10
 var.name <- "R"
@@ -92,10 +112,10 @@ TRUE <- 1
 function <- 10  
 
 
-# 01- data types and data objects
+# 02- data types and data objects
 # https://www.geeksforgeeks.org/r-data-types/
 
-# numeric, integer, logical, character, complex
+# 1) data types: numeric, integer, logical, character, complex
 
 # Double
 
@@ -137,7 +157,7 @@ class(x)
 
 # click File –> New File –> R Script
 
-# 02- data objects
+# 2) data objects
 # https://www.geeksforgeeks.org/r-objects/
 
 # A) Vectors/scalars
@@ -339,11 +359,9 @@ Array1 <- array(data = c(unlist(df1),  unlist(df2)),
                                 colnames(df1)))
 Array1 
 
-##################################################
-###### III. R function objects and operations ####
-##################################################
+# 03-R function objects and operations 
 
-# 01- Built-in Functions
+# 1) Built-in Functions
 # https://www.datacamp.com/doc/r/functions
 
 # Numeric Functions
@@ -392,7 +410,7 @@ sum(c(1, 2))
 sum(1, 2, 3, NA, na.rm = TRUE)
 paste0("hell", "o ", "world", "!") # note the "o "
 
-# 02- installing and loading packages
+# 2) installing and loading packages
 
 # --from CRAN
 # Install packages by IDE or using install.packages()
@@ -432,7 +450,7 @@ library(tidyverse)
 ?stats::filter
 ?dplyr::filter
 
-# 03-using self-defined functions
+# 3) self-defined functions
 # # https://rpubs.com/NateByers/functions
 # 
 # # Writing functions
@@ -469,42 +487,20 @@ quadratic <- function(a, b, c){
 quadratic(1, 6, 9)
 quadratic(1, -8, 15)
 
-################################################
-## IV. naming objects and operating on them ####
-################################################
-
-# 01-rules for naming objects
-
-# using char, number and underscore to name objects
-
-# the names are case sensitive 
-
-o <- 10  # assign/set o to 10
-O <-  5  # assign/set O to  5
-
-o * O  
-o * 0  # Note: O differs from 0
-o / O
-O / 0
-
-length(o) # Object shape
-dim(o)
-
-mode(o) # Object type
-
-# Avoid using spaces inside variables 
-
-# naming tea_pot instead of tea pot
-
-# 02-input objects into R environment
 
 ##############################################
-########### V. Best Practices for R ##########
+########### III. Best Practices for R ########
 ##############################################
 # https://swcarpentry.github.io/r-novice-inflammation/06-best-practices-R.html
 # https://www.r-bloggers.com/2024/06/writing-r-code-the-good-way/
 
-# 01- well-organized project 
+# 01-Link Rstudio with github 
+
+# https://happygitwithr.com/rstudio-git-github
+# Link myClass to a tutorial_2026
+
+
+# 02- well-organized project 
 # A well-organized directory structure helps navigating 
 # the project efficiently. It separates data, scripts, and 
 # results, making it easier to locate and manage files
@@ -515,20 +511,20 @@ mode(o) # Object type
 #   └── results/
 
 
-# 02- Customizing Snippets for tracking
+# 03- Customizing Snippets for tracking
 # Starting with an annotated description of who write the
 # code and what the code does for track when you have to 
 # look at or change it in the future
 # https://blog.devgenius.io/how-to-automatically-create-headers-in-r-scripts-be69152ac23f
 
 
-# 03- Defining a relative path for import files into R and
+# 04- Defining a relative path for import files into R and
 # export them out R environment. For example:
 
 input_file <- "data/data.csv" 
 output_file <- "data/results.csv"
 
-# 04- annotating and marking code using # or #- to set off 
+# 05- annotating and marking code using # or #- to set off 
 #  code sections or separate the function definitions. 
 
 input_data <- read.csv(input_file) # read input 
@@ -536,21 +532,15 @@ sample_number <- nrow(input_data) # get number of samples
 results <- some_other_function(input_file, 
                                sample_number) 
 
-# 05-Proper indentation and spacing make code more readable 
+# 06-Proper indentation and spacing make code more readable 
 #  and maintainable
 
 vec <- c(1, 2, 3)
 
-# 06- Pipes are used for streamline code by chaining 
+# 07- Pipes are used for streamline code by chaining 
 #  operations in a readable manner
 
 library(dplyr)
 data %>%
   filter(x > 1) %>%
   summarise(mean_y = mean(y))
-
-##############################################
-####### VI. Link Rstudio with github ########
-##############################################
-# https://happygitwithr.com/rstudio-git-github
-# Link your recol to a tutorial_2026
