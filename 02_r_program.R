@@ -48,7 +48,7 @@ TRUE | FALSE # “|” is for Logical OR
 
 # open editor: File > new file > R script
 # repeat above in the RStuido editor and run
-# save the script in a given folder: Desktop/myclass
+# save the script in a given folder: Desktop/myClass
  
 ##################################################
 ########## II. R objects and operation ###########
@@ -58,17 +58,15 @@ TRUE | FALSE # “|” is for Logical OR
 # https://www.geeksforgeeks.org/r-language/r-variables/
 # Variables are objects in R that are used to store values
 
-# Assign a string using "=", "<-" or "->" operator
-var1 = "Hello Geeks"
-print(var1) # input objects into R environment
+# A) Assign a string using "=", "<-" or "->" operator
+var1 = "Hello Geeks" # input objects into R environment
+print(var1) 
 
 x <- 5 #  assigned x value of 5
 y <- 7 # assigned y value of 7
+9 -> z # assigned z value of 9
 
-9 -> z
-
-# naming objects and operating on them
-# using char, number and underscore to name objects
+# B) naming variable objects and operating on them
 # the names are case sensitive 
 
 o <- 10  # assign/set o to 10
@@ -84,33 +82,31 @@ dim(o)
 
 mode(o) # Object type
 
-# Avoid using spaces inside variables 
 
+# using char, number and underscore to name objects to avoid spaces 
 # naming tea_pot instead of tea pot
 
-
-
-var1 <- 10
-var.name <- "R"
+var2 <- 10
+var.name <- "2.91"
 var_name <- TRUE
 
-value <- 100
-Value <- 200
-
-var$1 <- 5   
-var#1 <- 10 
+value1 <- 100
+Value2 <- 200
 
 var <- 10
 .var <- "Hello"
 
+# C) the followings are not permitted
+
+var$1 <- 5  #  not permitted
+var#1 <- 10 # not permitted
+
 2var <- 5    
 _var <- 10
-
 .3var <- 10 
 
 TRUE <- 1    
 function <- 10  
-
 
 # 02- data types and data objects
 # https://www.geeksforgeeks.org/r-data-types/
@@ -119,50 +115,44 @@ function <- 10
 
 # Double
 
-x <- 5.23 # Assign a decimal value to x
+x1 <- 5.23 # Assign a decimal value to x1
 
-is.numeric(x) # check the data type
-is.integer(x)
-is.double(x) # the same as is.numeric()
+is.numeric(x1) # check the data type
+is.integer(x1)
+is.double(x1) # the same as is.numeric()
 
-class(x) # check the data type
-typeof(x)
-mode(x)
+class(x1) # check the data type
+typeof(x1)
+mode(x1)
 
 # Integer
 
-x <- 5L 
+x2 <- 5L 
 
 # Logical
 
-x <- c(TRUE, TRUE, FALSE)
+x3 <- TRUE
 
 # Character
 
-x <- "elevated"
-is.character(x)
-is.numeric(x)
+x4 <- "elevated"
+is.character(x4)
+is.numeric(x4)
 
-x <- "3.14"
-is.character(x)
-is.numeric(x)
+x5 <- "3.14"
+is.character(x5)
+is.numeric(x5)
 
 # complex
 
-x <- 1 + 2i
-class(x)
-
-# These operations can be repeated in the RStudio script
-# editor:
-
-# click File –> New File –> R Script
+x6 <- 1 + 2i
+class(x6)
 
 # 2) data objects
 # https://www.geeksforgeeks.org/r-objects/
 
 # A) Vectors/scalars
 
-c(1,4,7)
 Num_variable <- c(1,4,7) # assign this to a variable for future use
 print(Num_variable)
 (Num_variable <- c(1,4,7)) # assign and print(s) 
@@ -172,8 +162,7 @@ length(Num_variable)  # How many elements
 typeof(Num_variable)  # Of which type
 is.vector(Num_variable) # Data structure
 is.list(Num_variable)
-names(Num_variable)
-str(Num_variable) 
+str(Num_variable) # numeric vector, its length =3, the three elements
 
 a <- 100
 is.vector(a)
@@ -187,8 +176,8 @@ which(Num_variable == "4") # know elements for location
 # Indexing by subset()
 
 (v <- c(1:2, NA, 4:6, NA, 8:10))
-v[v > 5] # missing/NA values are preserved
-subset(v, v > 5)  # missing/NA values are lost 
+v[v > 5] # missing/NA values are preserved, 
+subset(v, v > 5)  # missing/NA values are lost; v[(v > 5) & !is.na(v > 5)]
 
 # B) Rectangular objects
 
@@ -204,24 +193,23 @@ z <- 7:9
 
 # matrix attributions
 
-mode(m0)
-typeof(m0)
-length(m0)
-
-is.vector(m0)
-is.matrix(m0)
-dim(m0)
+mode(m1)
+typeof(m1)
+length(m1)
+is.vector(m1)
+is.matrix(m1)
+dim(m1)
 
 # Indexing matrices
 
-m0[2, 3] #  rows, or columns of matrices
-m0 > 5  # returns a matrix of logical values
-sum(m0) # Computations with matrices
-max(m0)
-mean(m0)
-colSums(m0)
-rowSums(m0)
-t(m0)
+m1[2, 3] #  rows, or columns of matrices
+m1 > 5  # returns a matrix of logical values
+sum(m1) # Computations with matrices
+max(m1)
+mean(m1)
+colSums(m1)
+rowSums(m1)
+t(m1)
 
 # b) data frames/tibbles
 
@@ -322,42 +310,36 @@ df$gender <- as.factor(df$gender)
 df$gender
 
 # convert matrix to data.frame
-matrix_data=matrix(c(1,2,3,4,5,6,7,8), nrow=4) # default byrow=FALSE
-print(matrix_data) 
-class(matrix_data)
-dataframe_data=as.data.frame(matrix_data) # convert the matrix into dataframe
-print(dataframe_data)
-class(dataframe_data)
+m2 = matrix(c(1,2,3,4,5,6,7,8), nrow=4) # default byrow=FALSE
+print(m2) 
+class(m2)
+df2 = as.data.frame(m2) # convert the matrix into dataframe
+print(df2)
+class(df2)
 
-dataframe_data1 <- data.frame(a = 1:3, b = letters[10:12],
-                              c = seq(as.Date("2004-01-01"), by = "week", 
-                                      length.out = 3),
-                              stringsAsFactors = TRUE)
-dataframe_data1 
-class(dataframe_data1)
+df3 <- data.frame(a = 1:3, b = letters[10:12],
+                  c = seq(as.Date("2004-01-01"), by = "week", length.out = 3),
+                  stringsAsFactors = TRUE)
+df3
+class(df3)
 
-matrix_data1 <- data.matrix(dataframe_data1[1:2]) # column
-class(dataframe_data1[1:2])
-
-matrix_data1
-class(matrix_data1)
-
-matrix_data2 <- data.matrix(dataframe_data1)
-matrix_data2
+m3 <- data.matrix(df3[1:2]) # column
+m3
+class(m3)
 
 # convert a dataframe to an array
 
-df1 <- data.frame(x = 1:5, y = 5:1)
-df1
+df4 <- data.frame(x = 1:5, y = 5:1)
+df4
 
-df2 <- data.frame(x = 11:15,y = 15:11)
-df2
+df5 <- data.frame(x = 11:15,y = 15:11)
+df5
 
-Array1 <- array(data = c(unlist(df1),  unlist(df2)),
-                dim = c(5, 2, 2),
-                dimnames = list(rownames(df1),
-                                colnames(df1)))
-Array1 
+array1 <- array(data = c(unlist(df4),  unlist(df5)), # unlist
+                dim = c(5, 2, 2), # row-col-layer
+                dimnames = list(rownames(df4),
+                                colnames(df4)))
+array1 
 
 # 03-R function objects and operations 
 
@@ -375,8 +357,8 @@ round(8.4)
 
 # Character Functions
 
-?substr
 x <- "abcdef"
+?substr
 substr(x , 2, 4)
 substr(x = "television", start = 5, stop = 10)
 
@@ -392,14 +374,10 @@ x <- "abcdef"
 toupper(x)
 
 # Statistical Functions
-?mean
-mean(x, trim=0,na.rm= FALSE )
 
 x <- c(2, 4, 6, 100)
 mean(x)
-
-x <- c(2, 4, 6, 100)
-mean(x, trim = 0.25)
+mean(x, trim = 0.25) # mean(x, trim=0, na.rm= FALSE )
 
 sum(x)
 range(x)
@@ -429,18 +407,8 @@ paste0("hell", "o ", "world", "!") # note the "o "
 #                  dependencies=TRUE)
 
 # --from Zip files
-# Installing R Packages from Zip Files by IDE or
-# install.packages('C:/Users/User/Downloads/abc_2.1.zip',
-#                  repos=NULL, type='source')
+# Installing R Packages from Zip Files by IDE 
 
-# 
-# library(ds4psy)  # load the package
-# plot_fn() # check the parameters
-# plot_fn(x = 1)
-# plot_fn(x = 7)
-# plot_fn(x = 5, y = 1)
-# plot_fn(x = 5, y = 5, A = TRUE, B = FALSE, C = TRUE, 
-#         D = FALSE, E = FALSE, F = FALSE,  g = "black")
 
 library(tidyverse)
 
