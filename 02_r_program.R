@@ -494,7 +494,7 @@ quadratic(1, -8, 15)
 # https://swcarpentry.github.io/r-novice-inflammation/06-best-practices-R.html
 # https://www.r-bloggers.com/2024/06/writing-r-code-the-good-way/
 
-# 01-Link Rstudio with github 
+# 01-Link a Rstudio project with github 
 
 # https://happygitwithr.com/rstudio-git-github
 # Link myClass to a tutorial_2026
