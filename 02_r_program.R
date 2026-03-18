@@ -57,9 +57,9 @@ TRUE | FALSE # “|” is for Logical OR
 # 01- R Variables
 # https://www.geeksforgeeks.org/r-language/r-variables/
 # Variables are objects in R that are used to store values
-
+rm(list = ls())
 # A) Assign a string using "=", "<-" or "->" operator
-var1 = "Hello Geeks" # input objects into R environment
+(var1 = "Hello Geeks") # input objects into R environment
 print(var1) 
 
 x <- 5 #  assigned x value of 5
@@ -283,6 +283,9 @@ df$gender
 l_1 <- list(1, 2, 3) # 3 elements (all numeric scalars)
 l_1
 
+vector <- c(1,2,3)
+vector
+
 l_2 <- list(1, c(2, 3))  # 2 elements (different lengths)
 l_2
 
@@ -335,6 +338,7 @@ df4
 df5 <- data.frame(x = 11:15,y = 15:11)
 df5
 
+?unlist
 array1 <- array(data = c(unlist(df4),  unlist(df5)), # unlist
                 dim = c(5, 2, 2), # row-col-layer
                 dimnames = list(rownames(df4),
@@ -347,7 +351,7 @@ array1
 # https://www.datacamp.com/doc/r/functions
 
 # Numeric Functions
-abs(12)
+abs(-12)
 log(12)
 sqrt(121)
 exp(15)
@@ -393,8 +397,8 @@ paste0("hell", "o ", "world", "!") # note the "o "
 # --from CRAN
 # Install packages by IDE or using install.packages()
 
-# install.packages('readr')
-# install.packages(c('readr', 'ggplot2', 'tidyr'))
+install.packages('readr')
+install.packages(c('readr', 'ggplot2', 'tidyr'))
 
 # --from GitHub
 
@@ -422,15 +426,15 @@ library(tidyverse)
 # # https://rpubs.com/NateByers/functions
 # 
 # # Writing functions
-# myMean <- function(x){
-#   total_count_of_values <- length(x)
-#   total_sum_of_values <- sum(x)
-#   average_of_values <- total_sum_of_values/total_count_of_values
-#   average_of_values
-# }
-# 
+myMean <- function(x){
+  total_count_of_values <- length(x)
+  total_sum_of_values <- sum(x)
+  average_of_values <- total_sum_of_values/total_count_of_values
+  average_of_values
+}
 
-source("src/myMean.R") 
+
+source("myMean.R") 
 
 my_vector <- c(1, 3, 5, 2, 6, 9, 0)
 vector_mean <- myMean(x = my_vector)
@@ -441,7 +445,7 @@ vector_mean
 #   return(y)
 # }
 
-source("src/add_three.R")
+source("add_three.R")
 add_three(5)
 
 quadratic <- function(a, b, c){
