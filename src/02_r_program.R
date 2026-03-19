@@ -11,7 +11,8 @@
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
 
-# https://bookdown.org/manishpatwal/bookdown-demo/list-in-r.html
+
+.# https://bookdown.org/manishpatwal/bookdown-demo/list-in-r.html
 
 #######################################################
 ################ I. R and RStudio #####################
