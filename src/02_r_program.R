@@ -1,3 +1,4 @@
+
 # --------------------------------------------
 # Script Name: Basic R (object-oriented programming)
 # Purpose: This provide an overview of RStudio and show
@@ -10,7 +11,6 @@
 # --------------------------------------------
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
-
 
 .# https://bookdown.org/manishpatwal/bookdown-demo/list-in-r.html
 
@@ -446,7 +446,7 @@ vector_mean
 #   return(y)
 # }
 
-source("add_three.R")
+source("src/add_three.R")
 add_three(5)
 
 quadratic <- function(a, b, c){
@@ -517,3 +517,4 @@ library(dplyr)
 data %>%
   filter(x > 1) %>%
   summarise(mean_y = mean(y))
+
