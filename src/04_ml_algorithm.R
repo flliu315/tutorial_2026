@@ -296,11 +296,12 @@ ggplot() +
 
 
 ##########################################
-## 04-build regression models with caret
+## 04-build machine learning models by caret
 ##########################################
 # https://r.qcbs.ca/workshop04/book-en/multiple-linear-regression.html
+
 library(caret)
-# 1) first take a look at the algorithms
+# 1) taking a look at the algorithms
 modelnames <- paste(names(getModelInfo()), collapse=',')
 modelnames
 
@@ -308,7 +309,7 @@ modelLookup("rpart")
 modelLookup("rf")
 modelLookup("gbm")
 
-# 2) training the models with machine learning
+# 2) training regression models 
 # A) load and split data 
 df5 <- read.csv("data/dickcissel.csv", 
                  stringsAsFactors = TRUE)
@@ -370,8 +371,8 @@ fitControl <- trainControl(method = "repeatedcv",
 # the ways include tunelength (automatically),
 # tuneGrid (manually) and search = “random”,
 
-# 3) training and evaluating models
-# A) a decision tree 
+# E) training and evaluating models
+# a. a decision tree 
 model_rpart <- train(abund ~ ., data = data_train, 
                      method = "rpart", # the tree algorithm
                      trControl = fitControl,
@@ -393,7 +394,7 @@ predictions_rpart <- predict(model_rpart, newdata = data_test)
 # evaluate regression performance
 Metrics::rmse(data_test$abund, predictions_rpart)
 
-# B) training a rf regression
+# b. training a rf regression
 
 model_rf <- train(abund ~ ., data = data_train, 
                   method = "rf",# rf algorithm
@@ -406,7 +407,7 @@ predictions_rf <- predict(model_rf, newdata = data_test)
 
 Metrics::rmse(data_test$abund, predictions_rf)
 
-# C) training a boosting regression
+# c. training a boosting regression
 
 model_gbm <- train(abund ~ ., data = data_train, 
                    method = "gbm", # boosting algorithm
@@ -419,7 +420,7 @@ predictions_gbm <- predict(model_gbm, newdata = data_test)
 
 Metrics::rmse(data_test$abund, predictions_gbm)
 
-# D) Compare the models' performances for final picking
+# d. Compare the models' performances for final picking
 models_compare <- resamples(list(TREE=model_rpart, 
                                  RF=model_rf, 
                                  GBM=model_gbm))
@@ -430,61 +431,15 @@ scales <- list(x=list(relation="free"),
                y=list(relation="free"))
 bwplot(models_compare, scales=scales)
 
-#################################################
-# 05- build classification models using caret
-#################################################
+# 3) building classification models
 
-# 1) building a classification model with randomForest
+# the models from caret
+model_info <- getModelInfo()
+names(model_info)
+model_info[["rf"]]$parameters
 
-data(iris)
-head(iris)
+# A) loading and spliting data
 
-# A) Split data into training and test sets
-
-n <- nrow(iris) # Determine the number of rows
-train_samples <- round(0.75 * n) # the number of train samples
-train_index <- sample(1:n, train_samples) # Sample row indices
-train <- iris[train_index, ]
-test <- iris[-train_index, ]
-
-# Train a rf model 
-library(randomForest)
-set.seed(1234)
-rf_model <- randomForest(Species ~ ., 
-                         data = train, 
-                         importance = T)
-
-# View the model
-print(rf_model)
-plot(rf_model)
-
-# Algorithm Tune (tuneRF) for mtry
-set.seed(123)
-bestmtry <- tuneRF(x= train[,-5], y= train[,5], 
-                   stepFactor = 0.5, 
-                   plot = TRUE, 
-                   ntreeTry = 300,
-                   trace = TRUE, 
-                   improve = 0.05)
-print(bestmtry)
-
-rf_final <- randomForest(Species~., data=train, ntree = 300, 
-                         mtry = 2, importance = TRUE)
-
-print(rf_final)
-plot(rf_final)
-
-# Evaluating the Model 
-predictions <- predict(rf_final, test) # make predictions
-confusion_matrix <- table(test$Species, predictions) # Create a confusion matrix
-print(confusion_matrix) # View the confusion matrix
-
-# Get feature importance
-importance(rf_final) 
-varImpPlot(rf_final)
-
-# 2) building a classification model with caret
-library(caret)
 data(iris) 
 head(iris)
 
@@ -493,30 +448,42 @@ index <- createDataPartition(iris$Species, p=0.8, list=FALSE) #
 train_data <- iris[index,]
 test_data <- iris[-index,]
 
+# B) feature selection
 featurePlot(x = iris[, 1:4], y = iris$Species, plot = "density",
             scales = list(x = list(relation = "free"), y = list(relation="free")),
             pch = "|",
             layout = c(4, 1),
             auto.key = list(columns = 3))
 
-set.seed(123)
+
+set.seed(123) 
 ctrl <- rfeControl(functions = rfFuncs,
                    method = "repeatedcv",
                    repeats = 5,
                    verbose = FALSE)
+
 lmProfile <- rfe(x = iris[, 1:4], y = iris$Species, rfeControl = ctrl)
 lmProfile
 
-model_info <- getModelInfo()
-names(model_info)
-
-
+# C) training a model with rf
+# a. using default trainControl for optimal mtry
+# i.e. trainControl(method = "boot", number = 25)
 set.seed(123)
-rf_fit1 <- train(Species~., data = train_data, method="rf")
+rf_fit1 <- train(Species~., 
+                 data = train_data, 
+                 method="rf")  
+
+# rf_fit1 <- train(Species~., 
+#                  data = train_data, 
+#                  method="rf",
+#                  trControl = trainControl(method = "boot", 
+#                                           number = 25))  
+
 rf_fit1
 plot(rf_fit1)
 
 
+# b. using self-defined trainControl way for optimal mtry
 fitControl <- trainControl(method = "repeatedcv", number = 5, 
                            repeats=3) 
 
@@ -528,18 +495,19 @@ rf_fit2
 
 library(ModelMetrics)  
 library(MLmetrics)
-fitControl <- trainControl(method = 'repeatedcv', number = 5, repeats =3,
-                           savePredictions = 'final', 
-                           classProbs = TRUE,                 
-                           summaryFunction=multiClassSummary) 
 
-model_info[["rf"]]$parameters
+# c. self-defined optimal parameters
+fitControl <- trainControl(method = 'repeatedcv', number = 5, repeats =3,
+                           savePredictions = 'final', # keep results
+                           classProbs = TRUE, # prob values                
+                           summaryFunction=multiClassSummary) # metrics
 
 rf_fit3 <- train(Species ~ ., data = train_data, method = "rf", 
-                 tuneLength = 5,
+                 tuneLength = 5, # optimal mtry
                  trControl = fitControl,
                  verbose = FALSE)
-rf_fit3$results
+
+rf_fit3
 
 # rf_pred <- predict(rf_fit3, test_data)
 # rf_pred
@@ -555,38 +523,9 @@ rf_fit4 <- train(Species ~ ., data = train_data,  method = "rf",
                  tuneGrid = tune_grid,
                  trControl = fitControl,
                  metric = "Accuracy")
-rf_fit4$results
+rf_fit4
 
-library(dplyr)
-cor_matrix <- train_data %>%
-  select(where(is.numeric), -Species) %>%  # 只选数值列，排除 Species
-  cor(use = "pairwise.complete.obs")  # 计算相关矩阵，去掉 NA
-cor_matrix
-
-to_remove <- findCorrelation(cor_matrix, # 查找并删除相关性高的变量
-                             cutoff = 0.6, verbose = T, names = T, exact = T) 
-print(to_remove)
-clean_01 <- train_data[, !names(train_data) %in% to_remove]
-
-
-df_01 <- data.frame(x1 = c("A", "A", "B","B", "C","C"),
-                    x2 = c(2.5, 1.2, 1.9, 2.3, 2.5, 1.9),
-                    y = c(3.8, 2.2, 2.7, 3.0,2.8, 2.2))
-dummy <- dummyVars(y ~ ., data = df_01) # 用y列定义独热编码函数
-df_02 <- predict(dummy, newdata = df_01) %>% # 对数据集进行独热编码
-  as.data.frame()
-df_02$y <- df_01$y # 重新增加编码过程中消失的y列
-
-nzv <- nearZeroVar(clean_01, saveMetrics= T)
-nzv_to_remove <- nzv %>% 
-  filter(zeroVar==T | nzv==T) %>% 
-  tibble::rownames_to_column("col_names") # 列举近零方差变量
-clean_02 <-  clean_01 %>% 
-  select(-pull(nzv_to_remove, col_names)) # 删除近零方差变量
-med_impute <-  preProcess(clean_02, method="medianImpute") 
-clean_03 <- predict(med_impute, newdata = clean_02)
-
-
+# d. adding data preProcess 
 set.seed(123)
 rf_fit5 <- train(Species ~ .,
                  data = train_data, 
@@ -597,7 +536,7 @@ rf_fit5 <- train(Species ~ .,
                  tuneLength=5) 
 rf_fit5
 
-# comparison of several models
+# D) comparison of several algorithms
 
 library(caretEnsemble)
 fitControl <- trainControl(
