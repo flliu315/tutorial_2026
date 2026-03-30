@@ -19,11 +19,11 @@ rm(list = ls()) # Remove all variables
 data()  # Data sets in package ‘datasets’
 
 data(package = .packages(all.available = TRUE)) # list the data sets in all *available* packages
-
 all_datasets <- data(package = "datasets")$results[, "Item"] # Counting Number of Built-in Datasets
 length(all_datasets)
 
 data(package = "ade4") 
+
 library(ade4)
 data(doubs) # load the dataset
 head(doubs) # Checking the Structure of the Dataset
@@ -36,6 +36,7 @@ library("tidyverse")  # load the tidyverse packages, incl. dplyr
 # A) select(), filter(), mutate(), and pipe using dplyr
 
 # use pipes for manipulating data
+
 doubs$env %>% 
   select(dfs, alt, oxy) %>%   # select dfs, alt, pen
   filter(alt > 300)  # filter alt > 300 

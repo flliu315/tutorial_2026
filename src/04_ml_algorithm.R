@@ -84,18 +84,33 @@ abline(coef=theta, col='red')
 #################################################
 # A) CRAT for classification
 # https://medium.com/@justindixon91/decision-trees-afc984d161bf
-Class <- as.factor(c(0,0,0,0,0,1,1,1,1,1)) # 2 class vector
-X1 <- c(0.6,0.8,1.2,1.3,1.7,2.3,2.5,2.9,3.1,3.2) # feature1
-X2 <- c(0.8,1.8,2.7,0.4,2.2,0.7,2.4,1.6,2.1,0.2) # feature2
-df2 <- cbind.data.frame(Class, X1, X2) 
+# https://www.causalmlbook.com/classification-and-regression-trees-cart.html
 
-plot(X1,X2,col="white")
-points(X1[Class=="0"], X2[Class=="0"], col="blue", pch=19)
-points(X1[Class=="1"], X2[Class=="1"], col="red", pch=19)
+y <- c(0,0,1,0,1,2,2,2,2,2) # 3 class vector
+x1 <- c(0.6,0.8,1.2,1.3,1.7,2.3,2.5,2.9,3.1,3.2) # feature1
+x2 <- c(0.8,1.8,2.7,0.4,2.2,0.7,2.4,1.6,2.1,0.2) # feature2
+df2 <- data.frame(y, x1, x2) 
+df2
+
+df2 <- df2 %>%
+  mutate(pch_vals = case_when(
+    y == 0 ~ 16,    # 16 = solid circle
+    y == 1 ~ 2,    # 17 = triangle
+    y == 2 ~ 1      # 1 = hollow circle
+  ))
+
+# Plot with different shapes based on `pch_vals`
+plot(df2$x1, df2$x2,
+     pch = df2$pch_vals, lwd = 2,
+     ylab = "x2", xlab = "x1")
+
+#  the optimal cutoff point/split on x1 should be 2.0
+abline(v = 2.0, lty = 5, lwd = 2)
+abline(h = 2.0, lty = 5, lwd = 2)
 
 # calculate Gini Impurity to decide The potential splits
-min(X1)
-max(X1)
+min(x1)
+max(x1)
 Predictor1test <- seq(from = 0, to = 4, by = 0.1) # < min(x1) and >max(x1)
 length(Predictor1test)
 Predictor2test <- seq(from =0, to = 3, by = 0.1) 
@@ -104,11 +119,11 @@ length(Predictor2test)
 # Function to calculate the proportion of obs in the split
 CalculateP <- function(i, index, m, k) { 
   if(m=="L") { # region (m) which match to class (k) 
-    Nm <- length(df$Class[which(df[,index] <= i)]) # The number of obs in the region Rm
-    Count <- df$Class[which(df[,index] <= i)] == k # The number of obs that match the class k
+    Nm <- length(df2$y[which(df2[,index] <= i)]) # The number of obs in the region Rm
+    Count <- df2$y[which(df2[,index] <= i)] == k # The number of obs that match the class k
   } else {
-    Nm <- length(df$Class[which(df[,index] > i)])
-    Count <- df$Class[which(df[,index] > i)] == k
+    Nm <- length(df2$y[which(df2[,index] > i)])
+    Count <- df2$y[which(df2[,index] > i)] == k
   } 
   P <- length(Count[Count==TRUE]) / Nm # Proportion calculation
   return(c(P,Nm)) # Returns the proportion and the number of obs
@@ -129,6 +144,7 @@ CalculateGini <- function(x, index) { # calculate the Gini Impurity
 }
 
 Gini <- CalculateGini(Predictor1test, 2)
+Gini
 Predictor1test_gini <- cbind.data.frame(Predictor1test, Gini)
 Predictor1test_gini
 
@@ -144,12 +160,14 @@ Predictor2test_gini
 ggplot(data = Predictor2test_gini, aes(x = Predictor2test, y = Gini)) +
   geom_line() 
 
-# plot the tree with one root node
-library(tree)
-tree_df = tree(Class ~ ., data = df2)
-plot(tree_df)
-text(tree_df, pretty = 0)
-title(main = "Classification Tree")
+# train a classification tree using rpart
+library(rpart)
+tree_class = rpart(y ~ ., data = df2, method = "class", 
+                   control = rpart.control(minsplit = 2))
+print(tree_class)
+summary(tree_class)
+library(rpart.plot)
+rpart.plot(tree_class, main = "Classification Tree")
 
 ## B) CART for regresssion
 # data and plot
@@ -161,7 +179,7 @@ y <- c(6.176, 3.434, 3.683, 3.479, 3.178, 3.497, 4.205, 3.258,
        2.197, 1.792, 2.197, 2.398, 2.708, 2.565, 1.386, 1.792,
        1.792, 2.565, 1.386, 1.946, 1.099)
 
-df3 <- cbind.data.frame(x, y)
+df3 <- data.frame(x, y)
 plot(x, y, pch=21)
 
 # the first point for partitioning
@@ -183,6 +201,12 @@ z <- seq(80, 7000)
 y <- predict(model, list(x =z))
 lines(z, y)
 
+tree_regres <- rpart(y ~ ., data = df3, method = "anova", 
+                      control = rpart.control(minsplit = 10))
+print(tree_regres)
+
+rpart.plot(tree_regres,main = "Regression Tree")
+
 #############################################################
 ## 03- the "boosting tree" for regression
 #############################################################
@@ -193,13 +217,14 @@ library(caret) # calculating mean squared error
 library(ggplot2) # visualizating
 library(randomForest) # comparing two building models
 
+data()
 df4 <- mtcars
 df4
 x_vars1 <- names(df4[2:ncol(df4)])
 x_vars <- paste(x_vars1, collapse = " + ") # for convince
-
+x_vars
 # ROUND 1
-df4$pred_1 <- mean(df$mpg)
+df4$pred_1 <- mean(df4$mpg)
 df4
 
 df4$resd_1 <- (df4$mpg - df4$pred_1)
@@ -209,7 +234,7 @@ head(df4)
 mdl <-eval(
   parse(text = 
           paste0(
-            "tree(resd_1~", x_vars, ", data=df)"
+            "tree(resd_1~", x_vars, ", data=df4)"
           ) # creating string with paste0
   )  # changing to expression with parse
 ) # evaluating the expression with eval
@@ -217,7 +242,8 @@ mdl <-eval(
 df4$pred_2 <- predict(mdl, df4)
 head(df4)
 
-df4$pred_1 + df4$pred_2
+# df4$resd_2 <- df4$mpg- (df4$pred_1 + df4$pred_2)
+
 df4$pred_1 + (0.1*df4$pred_2) # using LR=0.1 to avoid overfitting
 df4$resd_2 <- (df4$mpg- (df4$pred_1 + (0.1*df4$pred_2)))
 head(df4)
@@ -283,6 +309,7 @@ tree_mdl <-eval(parse(text = paste0("tree(mpg~", x_vars, ",
 prediction <- predict(tree_mdl, df4)
 tree_rmse <- RMSE(df4$mpg, prediction)
 
+
 # rf model
 rf_mdl <-eval(parse(text = paste0("randomForest(mpg~", x_vars, ", 
                                   data=df4)")))
@@ -299,6 +326,10 @@ ggplot() +
 ## 04-build machine learning models by caret
 ##########################################
 # https://r.qcbs.ca/workshop04/book-en/multiple-linear-regression.html
+
+
+
+
 
 library(caret)
 # 1) taking a look at the algorithms
