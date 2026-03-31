@@ -426,7 +426,7 @@ data("mtcars")
 
 # 1) for a decision tree model
 
-# A) Split data for proper evaluation (70/30 split)
+# A) Split data into train and test (70/30 split)
 
 set.seed(123)  # Reproducibility
 ind <- sample(1:nrow(mtcars), size = 0.7 * nrow(mtcars))
@@ -435,10 +435,15 @@ test_data <- mtcars[-ind, ]
 
 # B) find the most optimum parameters for a tree model
 # https://danstich.github.io/stich/classes/BIOL217/12_cart.html
+# https://rpubs.com/mpfoley73/529130
+
 library(rpart)
+?rpart
 library(rpart.plot)
-fulltree <- rpart(mpg ~ ., data = train_data, method = "anova",
-                  cp = 1e-06, minsplit = 2, minbucket = 1)
+fulltree <- rpart(mpg ~ ., data = train_data, 
+                  method = "anova",
+                  minsplit = 2, minbucket = 1,
+                  xval = 5) # 5-fold cross-validation
 printcp(fulltree)
 plotcp(fulltree)
 opt_index <- which.min(fulltree$cptable[,"xerror"])
@@ -448,10 +453,12 @@ prunedtree <- prune(fulltree, cp = opt_cp)
 rpart.plot(prunedtree)
 
 # C) model evaluation on test_data using R2 and RMSE
-tree_pred <- predict(prunedtree, test_data) 
+tree_pred <- predict(prunedtree, test_data, type = "vector") 
 library(caret)
 tree_R2 = R2(tree_pred, test_data$mpg)
+tree_R2 
 tree_rmse = RMSE(tree_pred, test_data$mpg)
+tree_rmse 
 
 # 2) for a random forest model
 
