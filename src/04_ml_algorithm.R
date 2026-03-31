@@ -207,9 +207,104 @@ print(tree_regres)
 
 rpart.plot(tree_regres,main = "Regression Tree")
 
-#############################################################
-## 03- the "boosting tree" for regression
-#############################################################
+######################################################
+## 03- Ensemble Learning for classification and regression
+######################################################
+# 1) Bagging algorithm for classification
+
+# classification for the df2
+y <- c(0, 0, 1, 0, 1, 2, 2, 2, 2, 2)  # labels
+x1 <- c(0.6, 0.8, 1.2, 1.3, 1.7, 2.3, 2.5, 2.9, 3.1, 3.2)  # feature1
+x2 <- c(0.8, 1.8, 2.7, 0.4, 2.2, 0.7, 2.4, 1.6, 2.1, 0.2)  # feature2
+df2 <- data.frame(y, x1, x2)
+
+# 
+clr <- c("pink", "red", "blue", "yellow", "darkgreen",
+         "orange", "brown", "purple", "darkblue")
+
+n <- nrow(df2)
+
+# set layout of 3x3 
+par(mfrow = c(3, 3))
+
+# training 9 trees (B = 9)
+for(i in 1:9) {
+  set.seed(123) 
+  idx <- sample(n, n, replace = TRUE)  # Bootstrap sampling
+  tr <- df2[idx, ]
+  
+  cart <- rpart(
+    y ~ x1 + x2,
+    data = tr,  
+    method = "class", 
+    control = rpart.control(minsplit = 2),
+    cp = 0  # unpruned
+  )
+  
+  prp(cart, box.col = clr[i])
+}
+
+par(mfrow = c(1, 1))
+
+# Bagging algorithm for regression
+
+library(ggplot2)
+library(caret) # evaluation performance
+
+data(mtcars)
+set.seed(123)
+n <- nrow(mtcars)
+B <- 50  # trainig 50 trees
+
+pred_list <- matrix(NA, nrow = n, 
+                    ncol = B) # save pred
+
+for(i in 1:B) {
+  # Bootstrap sampling
+  idx <- sample(n, n, replace = TRUE) 
+  tr <- mtcars[idx, ] 
+  
+  tree_model <- rpart(mpg ~ ., data = tr, 
+                      method = "anova", 
+                      control = rpart.control(minsplit = 2, cp = 0))
+  
+  pred_list[, i] <- predict(tree_model, newdata = mtcars)
+}
+
+
+bagging_pred <- rowMeans(pred_list)
+mse <- mean((mtcars$mpg - bagging_pred)^2)
+cat("Bagging Model MSE:", mse, "\n")
+
+ggplot(mtcars, aes(x = mpg, y = bagging_pred)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  xlab("Actual MPG") +
+  ylab("Predicted MPG") +
+  ggtitle("Bagging Model: Actual vs Predicted MPG") +
+  theme_minimal()
+
+# 2) randomforest algorithm
+
+library(randomForest)
+set.seed(123) 
+rf_model <- randomForest(mpg ~ ., data = mtcars, ntree = 500)
+print(rf_model)
+
+rf_model$mse
+rf_model$rsq
+
+rf_pred <- predict(rf_model, newdata = mtcars)
+ggplot(mtcars, aes(x = mpg, y = rf_pred)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  xlab("Actual MPG") +
+  ylab("Predicted MPG") +
+  ggtitle("Random Forest: Actual vs Predicted MPG") +
+  theme_minimal()
+
+
+## 3) the "boosting tree" for regression
 # A) run one round by one round to understand the "boosting"
 
 library(tree) # calculating residuals in decision tree 
@@ -300,15 +395,12 @@ for (i in 2:nrounds){
 
 results
 
-
 # C) compare the boosting algorithm to tree and rf models
-
 # tree model
 tree_mdl <-eval(parse(text = paste0("tree(mpg~", x_vars, ", 
                                     data=df4)")))
 prediction <- predict(tree_mdl, df4)
 tree_rmse <- RMSE(df4$mpg, prediction)
-
 
 # rf model
 rf_mdl <-eval(parse(text = paste0("randomForest(mpg~", x_vars, ", 
@@ -322,13 +414,191 @@ ggplot() +
   geom_hline(yintercept = rf_rmse, color = "blue", linetype = "dashed") 
 
 
+################################################
+## 04-build models and optimize their parameters
+##    to obtain high performance
+################################################
+data() 
+data("mtcars")
+?mtcars
+
+# 1) for a decision tree model
+
+# A) Split data for proper evaluation (70/30 split)
+
+set.seed(123)  # Reproducibility
+ind <- sample(1:nrow(mtcars), size = 0.7 * nrow(mtcars))
+train_data <- mtcars[ind, ]
+test_data <- mtcars[-ind, ]
+
+# B) find the most optimum parameters for a tree model
+# https://danstich.github.io/stich/classes/BIOL217/12_cart.html
+library(rpart)
+library(rpart.plot)
+fulltree <- rpart(mpg ~ ., data = train_data, method = "anova",
+                  cp = 1e-06, minsplit = 2, minbucket = 1)
+printcp(fulltree)
+plotcp(fulltree)
+opt_index <- which.min(fulltree$cptable[,"xerror"])
+opt_cp <- fulltree$cptable[opt_index, "CP"]
+opt_cp
+prunedtree <- prune(fulltree, cp = opt_cp)
+rpart.plot(prunedtree)
+
+# C) model evaluation on test_data using R2 and RMSE
+tree_pred <- predict(prunedtree, test_data) 
+library(caret)
+tree_R2 = R2(tree_pred, test_data$mpg)
+tree_rmse = RMSE(tree_pred, test_data$mpg)
+
+# 2) for a random forest model
+
+# A) Split data for proper evaluation (70/30 split)
+
+set.seed(123)  # Reproducibility
+ind <- sample(1:nrow(mtcars), size = 0.7 * nrow(mtcars))
+train_data <- mtcars[ind, ]
+test_data <- mtcars[-ind, ]
+
+# B) find the most optimum parameters for a tree model
+# https://www.geeksforgeeks.org/r-machine-learning/how-to-calculate-the-oob-of-random-forest-in-r/
+library(randomForest)
+set.seed(123)
+
+rf_model <- randomForest(
+  mpg ~ ., 
+  data = mtcars,
+  ntree = 500,
+  mtry = 3,   # 初始值（p=10 → p/3≈3）
+  importance = TRUE
+)
+
+plot(rf_model)
+
+# C) optimal mtry based on oob
+
+tune <- tuneRF(
+  x = mtcars[, -1],  
+  y = mtcars$mpg,
+  stepFactor = 1.5,  
+  improve = 0.01,    
+  ntreeTry = 500,
+  trace = TRUE,
+  plot = TRUE
+)
+best_mtry <- tune[which.min(tune[,2]), 1]
+best_mtry
+
+# D) using optimal mtry to re-train rf model
+
+rf_best <- randomForest(
+  mpg ~ ., 
+  data = mtcars,
+  ntree = 500,
+  mtry = best_mtry,
+  importance = TRUE
+)
+
+print(rf_best)
+
+# further optimizing ntree
+
+rf_temp <- randomForest(mpg ~ ., data = mtcars, ntree = 1000)
+
+plot(rf_temp$mse, type = "l", xlab = "Number of Trees", ylab = "OOB MSE")
+
+# optimal nodesize 
+
+nodesize_vals <- c(3, 5, 10)
+results <- data.frame()
+
+for (n in nodesize_vals) {
+  rf <- randomForest(
+    mpg ~ ., data = mtcars,
+    ntree = 500,
+    mtry = best_mtry,
+    nodesize = n
+  )
+  
+  res <- rbind(results, data.frame(
+    nodesize = n,
+    OOB_MSE = rf$mse[500]
+  ))
+}
+
+res
+
+# # view the importance of features
+# importance(rf_best)
+# varImpPlot(rf_best)
+
+# Evaluation on test data
+
+rf_model <- randomForest(
+  mpg ~ ., 
+  data = train_data,
+  ntree = 1000,
+  mtry = 3,
+  importance = TRUE
+)
+
+rf_model
+
+rf_pred <- predict(rf_model, newdata = test_data)
+rf_rmse <- sqrt(mean((test_data$mpg - pred)^2))
+rf_R2 <- 1 - sum((test_data$mpg - pred)^2) /
+  sum((test_data$mpg - mean(test_data$mpg))^2)
+
+rf_rmse
+rf_R2
+
+
+# build a boosting tree
+library(gbm)
+boost_model <- gbm(
+  mpg ~ ., 
+  data = train_data,
+  distribution = "gaussian",   # for regres
+  n.trees = 500,              
+  interaction.depth = 3,      
+  shrinkage = 0.01,            
+  n.minobsinnode = 2           
+)
+
+boost_pred <- predict(boost_model, newdata = test_data)
+boost_rmse <- RMSE(test_data$mpg, boost_pred)
+boost_rmse 
+
+cat("Tree RMSE: ", tree_rmse, "\n")
+cat("Boosting RMSE: ", boost_rmse, "\n")
+cat("RF RMSE: ", rf_rmse, "\n")
+
+results <- data.frame(
+  Actual = test_data$mpg,
+  RF_Pred = rf_pred,
+  Boost_Pred = boost_pred,
+  Tree_Pred = tree_pred
+)
+
+results_long <- reshape(results, 
+                        varying = c("RF_Pred", "Boost_Pred", "Tree_Pred"), 
+                        v.names = "Prediction", 
+                        timevar = "Model", 
+                        times = c("RF", "Boosting", "Tree"),
+                        direction = "long")
+
+ggplot(results_long, aes(x = Actual, y = Prediction, color = Model)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Model Comparison: Actual vs Predicted MPG",
+       x = "Actual MPG", y = "Predicted MPG") +
+  theme(legend.position = "top")
+
 ##########################################
-## 04-build machine learning models by caret
+## 05-build machine learning models by caret
 ##########################################
 # https://r.qcbs.ca/workshop04/book-en/multiple-linear-regression.html
-
-
-
 
 
 library(caret)
