@@ -418,6 +418,8 @@ ggplot() +
 ## 04-build models and optimize their parameters
 ##    to obtain high performance
 ################################################
+rm(list = ls())
+
 data() 
 data("mtcars")
 ?mtcars
@@ -545,8 +547,8 @@ rf_model <- randomForest(
 rf_model
 
 rf_pred <- predict(rf_model, newdata = test_data)
-rf_rmse <- sqrt(mean((test_data$mpg - pred)^2))
-rf_R2 <- 1 - sum((test_data$mpg - pred)^2) /
+rf_rmse <- sqrt(mean((test_data$mpg - rf_pred)^2))
+rf_R2 <- 1 - sum((test_data$mpg - rf_pred)^2) /
   sum((test_data$mpg - mean(test_data$mpg))^2)
 
 rf_rmse
