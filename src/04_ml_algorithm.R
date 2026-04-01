@@ -422,9 +422,10 @@ rm(list = ls())
 
 data() 
 data("mtcars")
+str(mtcars)
 ?mtcars
 
-# 1) for a decision tree model
+# 1) for a tree model between mpg and others
 
 # A) Split data into train and test (70/30 split)
 
@@ -432,6 +433,7 @@ set.seed(123)  # Reproducibility
 ind <- sample(1:nrow(mtcars), size = 0.7 * nrow(mtcars))
 train_data <- mtcars[ind, ]
 test_data <- mtcars[-ind, ]
+head(test_data)
 
 # B) find the most optimum parameters for a tree model
 # https://danstich.github.io/stich/classes/BIOL217/12_cart.html
@@ -440,27 +442,32 @@ test_data <- mtcars[-ind, ]
 library(rpart)
 ?rpart
 library(rpart.plot)
-fulltree <- rpart(mpg ~ ., data = train_data, 
+rpart_full <- rpart(mpg ~ ., data = train_data, 
                   method = "anova",
                   minsplit = 2, minbucket = 1,
                   xval = 5) # 5-fold cross-validation
-printcp(fulltree)
-plotcp(fulltree)
-opt_index <- which.min(fulltree$cptable[,"xerror"])
-opt_cp <- fulltree$cptable[opt_index, "CP"]
+print(rpart_full)
+
+printcp(rpart_full)
+plotcp(rpart_full)
+opt_index <- which.min(rpart_full$cptable[,"xerror"])
+opt_cp <- rpart_full$cptable[opt_index, "CP"]
 opt_cp
-prunedtree <- prune(fulltree, cp = opt_cp)
-rpart.plot(prunedtree)
+rpart_pruned <- prune(rpart_full, cp = opt_cp)
+print(rpart_pruned)
+
+rpart.plot(rpart_pruned)
+rpart.plot(rpart_full)
 
 # C) model evaluation on test_data using R2 and RMSE
-tree_pred <- predict(prunedtree, test_data, type = "vector") 
+rpart_pred <- predict(rpart_pruned, test_data, type = "vector") 
 library(caret)
-tree_R2 = R2(tree_pred, test_data$mpg)
-tree_R2 
-tree_rmse = RMSE(tree_pred, test_data$mpg)
-tree_rmse 
+rpart_R2 = R2(rpart_pred, test_data$mpg)
+rpart_R2 
+rpart_rmse = RMSE(rpart_pred, test_data$mpg)
+rpart_rmse 
 
-# 2) for a random forest model
+# 2) for a rf model between mpg and others
 
 # A) Split data for proper evaluation (70/30 split)
 
@@ -469,40 +476,47 @@ ind <- sample(1:nrow(mtcars), size = 0.7 * nrow(mtcars))
 train_data <- mtcars[ind, ]
 test_data <- mtcars[-ind, ]
 
-# B) find the most optimum parameters for a tree model
-# https://www.geeksforgeeks.org/r-machine-learning/how-to-calculate-the-oob-of-random-forest-in-r/
+# B) pre-train a rf model
+
 library(randomForest)
 set.seed(123)
-
 rf_model <- randomForest(
   mpg ~ ., 
-  data = mtcars,
+  data = train_data,
   ntree = 500,
   mtry = 3,   # 初始值（p=10 → p/3≈3）
   importance = TRUE
 )
 
+print(rf_model) # Mean of squared residuals → OOB MSE
 plot(rf_model)
 
-# C) optimal mtry based on oob
+# C) find the most optimum parameters for a rf model
+# mtry → ntree → nodesize（using OOB）
+# https://www.geeksforgeeks.org/r-machine-learning/how-to-calculate-the-oob-of-random-forest-in-r/
 
-tune <- tuneRF(
-  x = mtcars[, -1],  
-  y = mtcars$mpg,
+# optimize mtry based on OOB 
+
+mtry_res <- tuneRF(
+  x = train_data[, -1],  
+  y = train_data$mpg,
   stepFactor = 1.5,  
   improve = 0.01,    
   ntreeTry = 500,
   trace = TRUE,
   plot = TRUE
 )
-best_mtry <- tune[which.min(tune[,2]), 1]
+
+mtry_res
+
+best_mtry <- tune[which.min(mtry_res[,2]), 1]
 best_mtry
 
-# D) using optimal mtry to re-train rf model
+# re-train a rf model with optimal mtry
 
 rf_best <- randomForest(
   mpg ~ ., 
-  data = mtcars,
+  data = train_data,
   ntree = 500,
   mtry = best_mtry,
   importance = TRUE
@@ -510,50 +524,73 @@ rf_best <- randomForest(
 
 print(rf_best)
 
-# further optimizing ntree
+# optimize ntree after best_mtry
 
-rf_temp <- randomForest(mpg ~ ., data = mtcars, ntree = 1000)
+rf_temp <- randomForest(mpg ~ ., data = train_data, mtry=best_mtry,
+                        ntree = 1000)
 
 plot(rf_temp$mse, type = "l", xlab = "Number of Trees", ylab = "OOB MSE")
 
-# optimal nodesize 
+mse_vals <- rf_temp$mse
+diff_mse <- abs(diff(mse_vals))
+threshold <- 1e-4
+best_ntree <- which(diff_mse < threshold)[1]
+best_ntree
+
+# re-train rf with best_mtry and best_ntree
+
+rf_best <- randomForest(
+  mpg ~ ., 
+  data = train_data,
+  ntree = best_ntree,
+  mtry = best_mtry,
+  importance = TRUE
+)
+
+print(rf_best)
+
+# search optimal nodesize with OOB 
 
 nodesize_vals <- c(3, 5, 10)
-results <- data.frame()
+nodesize_res <- data.frame()
 
 for (n in nodesize_vals) {
   rf <- randomForest(
-    mpg ~ ., data = mtcars,
-    ntree = 500,
+    mpg ~ ., data = train_data,
+    ntree = best_ntree,
     mtry = best_mtry,
     nodesize = n
   )
   
-  res <- rbind(results, data.frame(
+  nodesize_res <- rbind(nodesize_res, data.frame(
     nodesize = n,
-    OOB_MSE = rf$mse[500]
+    OOB_MSE = oob_mse <- rf$mse[rf$ntree] # the final tree
   ))
 }
 
-res
+nodesize_res
 
-# # view the importance of features
-# importance(rf_best)
-# varImpPlot(rf_best)
+best_nodesize <- nodesize_res$nodesize[which.min(res$OOB_MSE)]
+best_nodesize
 
-# Evaluation on test data
+plot(nodesize_res$nodesize, res$OOB_MSE, type = "b",
+     xlab = "nodesize", ylab = "OOB MSE",
+     main = "Nodesize Tuning")
 
-rf_model <- randomForest(
+# re-train rf with optimal mtry, ntree, nodesize
+
+rf_final <- randomForest(
   mpg ~ ., 
   data = train_data,
-  ntree = 1000,
-  mtry = 3,
+  ntree = best_ntree,
+  mtry = best_mtry,
+  nodesize = best_nodesize,
   importance = TRUE
 )
 
-rf_model
+# D) evaluation on test data
 
-rf_pred <- predict(rf_model, newdata = test_data)
+rf_pred <- predict(rf_final, newdata = test_data)
 rf_rmse <- sqrt(mean((test_data$mpg - rf_pred)^2))
 rf_R2 <- 1 - sum((test_data$mpg - rf_pred)^2) /
   sum((test_data$mpg - mean(test_data$mpg))^2)
@@ -561,39 +598,120 @@ rf_R2 <- 1 - sum((test_data$mpg - rf_pred)^2) /
 rf_rmse
 rf_R2
 
+# E) view the importance of features
+importance(rf_final)
+varImpPlot(rf_final)
 
-# build a boosting tree
+# 3) for a boosting tree between mpg and others
+
+# A) Split data for proper evaluation (70/30 split)
+
+set.seed(123)  # Reproducibility
+ind <- sample(1:nrow(mtcars), size = 0.7 * nrow(mtcars))
+train_data <- mtcars[ind, ]
+test_data <- mtcars[-ind, ]
+
+# B) find the most optimum parameters for a gbm model
+# shrinkage → depth → n.trees（using CV）
+
 library(gbm)
-boost_model <- gbm(
+gbm_model <- gbm(
   mpg ~ ., 
   data = train_data,
   distribution = "gaussian",   # for regres
-  n.trees = 500,              
+  n.trees = 2000,              
   interaction.depth = 3,      
   shrinkage = 0.01,            
-  n.minobsinnode = 2           
+  n.minobsinnode = 3,
+  cv.folds=5)
+
+# best n.trees
+best_iter <- gbm.perf(gbm_model, method = "cv")
+best_iter
+
+# best depth and nodesize
+library(gbm)
+
+shrinkage_vals <- c(0.05, 0.01)
+depth_vals <- c(1, 2, 3)
+minobs_vals <- c(1, 2, 3)
+
+gbm_res <- data.frame()
+
+set.seed(123)
+
+for (s in shrinkage_vals) {
+  for (d in depth_vals) {
+    for (m in minobs_vals) {
+      
+      model <- tryCatch({
+        gbm(
+          mpg ~ .,
+          data = train_data,
+          distribution = "gaussian",
+          n.trees = ifelse(s == 0.05, 1500, 3000),  # ✅ 根据学习率调整树数
+          interaction.depth = d,
+          shrinkage = s,
+          n.minobsinnode = m,
+          bag.fraction = 0.8,   
+          cv.folds = 3,         
+          verbose = FALSE
+        )
+      }, error = function(e) return(NULL))
+      
+      if (is.null(model)) next  
+      
+      best_iter <- gbm.perf(model, method = "cv", plot.it = FALSE)
+      
+      gbm_res <- rbind(gbm_res, data.frame(
+        shrinkage = s,
+        depth = d,
+        minobs = m,
+        trees = best_iter,
+        error = min(model$cv.error)
+      ))
+    }
+  }
+}
+
+gbm_res
+
+best_params <- gbm_res[which.min(gbm_res$error), ]
+best_params
+
+# re-train a gbm model with best parameters
+gbm_final <- gbm(
+  mpg ~ .,
+  data = train_data,
+  distribution = "gaussian",
+  n.trees = best_params$trees,
+  interaction.depth = best_params$depth,
+  shrinkage = best_params$shrinkage,
+  n.minobsinnode = best_params$minobs
 )
 
-boost_pred <- predict(boost_model, newdata = test_data)
-boost_rmse <- RMSE(test_data$mpg, boost_pred)
-boost_rmse 
+# C) evaluation on test data
 
-cat("Tree RMSE: ", tree_rmse, "\n")
-cat("Boosting RMSE: ", boost_rmse, "\n")
-cat("RF RMSE: ", rf_rmse, "\n")
+gbm_pred <- predict(gbm_final, newdata = test_data)
+gbm_rmse <- RMSE(test_data$mpg, gbm_pred)
+gbm_rmse 
+
+cat("rpart RMSE: ", rpart_rmse, "\n")
+cat("gbm RMSE: ", gbm_rmse, "\n")
+cat("rf RMSE: ", rf_rmse, "\n")
 
 results <- data.frame(
   Actual = test_data$mpg,
-  RF_Pred = rf_pred,
-  Boost_Pred = boost_pred,
-  Tree_Pred = tree_pred
+  rf_Pred = rf_pred,
+  gbm_Pred = gbm_pred,
+  rpart_Pred = rpart_pred
 )
 
 results_long <- reshape(results, 
-                        varying = c("RF_Pred", "Boost_Pred", "Tree_Pred"), 
+                        varying = c("rf_Pred", "gbm_Pred", "rpart_Pred"), 
                         v.names = "Prediction", 
                         timevar = "Model", 
-                        times = c("RF", "Boosting", "Tree"),
+                        times = c("rf", "gbm", "rpart"),
                         direction = "long")
 
 ggplot(results_long, aes(x = Actual, y = Prediction, color = Model)) +
@@ -609,9 +727,9 @@ ggplot(results_long, aes(x = Actual, y = Prediction, color = Model)) +
 ##########################################
 # https://r.qcbs.ca/workshop04/book-en/multiple-linear-regression.html
 
-
-library(caret)
 # 1) taking a look at the algorithms
+library(caret)
+
 modelnames <- paste(names(getModelInfo()), collapse=',')
 modelnames
 
