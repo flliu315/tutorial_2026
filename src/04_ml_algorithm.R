@@ -726,8 +726,8 @@ ggplot(results_long, aes(x = Actual, y = Prediction, color = Model)) +
 ## 05-build machine learning models by caret
 ##########################################
 # https://r.qcbs.ca/workshop04/book-en/multiple-linear-regression.html
+rm(list = ls())
 
-# 1) taking a look at the algorithms
 library(caret)
 
 modelnames <- paste(names(getModelInfo()), collapse=',')
@@ -737,119 +737,121 @@ modelLookup("rpart")
 modelLookup("rf")
 modelLookup("gbm")
 
-# 2) training regression models 
+#######################################################
+# 1) train reg models between mpg and others of mtcars
+#######################################################
+
 # A) load and split data 
-df5 <- read.csv("data/dickcissel.csv", 
-                 stringsAsFactors = TRUE)
-str(df5)
-head(df5)
+data("mtcars")
+df5 <- mtcars
 
 set.seed(123)
-Index <- createDataPartition(df5$abund, p = 0.7, 
-                                  list = FALSE, 
-                                  times = 1) # a partition
-data_train <- df5[Index,]
-data_test <- df5[-Index,]
+Index <- createDataPartition(df5$mpg, p = 0.8, list = FALSE) 
+train <- df5[Index,]
+test <- df5[-Index,]
 
-
-# # B) self-defining pre-processing of training data
-# 
+# # B) pre-Processing the data setting for training
+##########################################################
+# skipping the whole B) step and running the C) step
+##########################################################
 # # a. one-hot encoding（categories → numeric）
-# 
-# dmy <- dummyVars(~ ., data = train_data)
-# 
-# train_x <- predict(dmy, train_data)
-# test_x  <- predict(dmy, test_data)
-# 
-# train_x <- as.data.frame(train_x)
-# test_x  <- as.data.frame(test_x)
-# 
-# # b. impute missing if having missing data
-# 
-# library(skimr)
-# skim(train_x)
-# skim(test_x)
-# 
-# pre <- preProcess(train_x, 
-#                   method = c("medianImpute", "center", "scale"))
-# 
-# train_x <- predict(pre, train_x)
-# test_x  <- predict(pre, test_x)
-# 
-# # c. pre-processing usually includes center and scale data
-#  
-# train_x_stded <- preProcess(train_x, method = c("center", "scale"))
 
-data_train_stded <- preProcess(data_train, method = c("center", "scale"))
+library(tidyverse)
+dmy <- dummyVars(~ ., data = train)
+train_dmy <- predict(dmy, train) %>% as.data.frame()
+test_dmy  <- predict(dmy, test) %>% as.data.frame()
 
-# C) self-defining re-sampling process for validation, and 
-# citing it in train() by the parameter trControl
+# b. impute missing and center/scale 
+
+library(skimr)
+skim(train_dmy)
+skim(test_dmy)
+
+preproc <- preProcess(train_dmy,
+                  method = c("medianImpute", "center", "scale"))
+
+train_preproced <- predict(preproc, train_dmy)
+head(train_preproced)
+test_preproced  <- predict(preproc, test_dmy)
+
+# c. deleting the variables with zero variance 
+
+nzv_cols <- nearZeroVar(train_preproced)
+cols_keep <- setdiff(seq_along(train_preproced), nzv_cols)
+train_final <- train_preproced[, cols_keep, drop = FALSE]
+test_final  <- test_preproced[, cols_keep, drop = FALSE]
+dim(train_final)
+dim(test_final)
+
+# d. self-defining re-sampling process for validation
 
 fitControl <- trainControl(method = "repeatedcv",   
                            number = 5,     # number of folds
-                           repeats = 2)    # repeated two times
+                           repeats = 3)    # repeated two times
 
 # ml_rpart <- train(...
 #                   trControl = fitControl,
 #                   ...
 #                   ) 
 
-# D) self-defining way for finding hyperparameters 
+# e. self-defining way for finding hyperparameters 
 
 # the ways include tunelength (automatically),
 # tuneGrid (manually) and search = “random”,
 
-# E) training and evaluating models
-# a. a decision tree 
-model_rpart <- train(abund ~ ., data = data_train, 
-                     method = "rpart", # the tree algorithm
+##############################################################
+# C) training and evaluating models with caret
+# a. a tree model
+
+fitControl <- trainControl(method = "repeatedcv",   
+                           number = 5,     # number of folds
+                           repeats = 3)    # repeated two times
+
+model_ranger <- train(mpg ~ ., data = train,
+                     method = "ranger", # the tree algorithm
                      trControl = fitControl,
-                     preProcess = c('scale', 'center'),
-                     tuneLength = 5,# find an optimal cp based on its 5 values
+                     preProcess = c('medianImpute', 'nzv','scale', 'center'),
+                     tuneLength = 5,# searching five cp
                      metric="RMSE") 
 
-# sum(is.na(data_train))  # number of missing values
-# data_train <- na.omit(data_train) # Remove the rows with missing values
-# or use imputation
-# preProcess(data_train, method = c("medianImpute"))
-# 
-# fitControl <- trainControl(method = "repeatedcv",   
-#                            number = 5) # reduce size of folds
-
 # Predict on the test data
-predictions_rpart <- predict(model_rpart, newdata = data_test)
+pred_ranger <- predict(model_ranger, newdata = test)
 
 # evaluate regression performance
-Metrics::rmse(data_test$abund, predictions_rpart)
+rmse_ranger <- caret::RMSE(test$mpg, pred_ranger)
+R2_ranger <- caret::R2(test$mpg, pred_ranger)
 
-# b. training a rf regression
+# b. a rf regression
 
-model_rf <- train(abund ~ ., data = data_train, 
+model_rf <- train(mpg ~ ., data = train, 
                   method = "rf",# rf algorithm
                   trControl = fitControl,
-                  preProcess = c('scale', 'center'),
+                  preProcess = c('medianImpute', 'nzv','scale', 'center'),
                   tuneLength = 5,
-                  metric="RSE") 
+                  metric="RMSE") 
 
-predictions_rf <- predict(model_rf, newdata = data_test)
+pred_rf <- predict(model_rf, newdata = test)
+rmse_rf <- caret::RMSE(test$mpg, pred_rf)
+R2_rf <- caret::R2(test$mpg, pred_rf)
 
-Metrics::rmse(data_test$abund, predictions_rf)
+# c. a boosting regression
 
-# c. training a boosting regression
+model_gbm <- train(mpg ~ ., data = train, 
+                  method = "gbm",# gbm algorithm
+                  trControl = fitControl,
+                  tuneGrid = expand.grid(
+                    n.trees = 30,
+                    interaction.depth = 1,
+                    shrinkage = 0.1,
+                    n.minobsinnode = 3),
+                  metric="RMSE") 
 
-model_gbm <- train(abund ~ ., data = data_train, 
-                   method = "gbm", # boosting algorithm
-                   trControl = fitControl,
-                   preProcess = c('scale', 'center'),
-                   tuneLength = 5,
-                   metric="RMSE")  
-
-predictions_gbm <- predict(model_gbm, newdata = data_test)
-
-Metrics::rmse(data_test$abund, predictions_gbm)
+pred_gbm <- predict(model_gbm, newdata = test)
+rmse_gbm <- caret::RMSE(test$mpg, pred_gbm)
+R2_gbm <- caret::R2(test$mpg, pred_gbm)
 
 # d. Compare the models' performances for final picking
-models_compare <- resamples(list(TREE=model_rpart, 
+models_compare <- resamples(list(RANGER=model_ranger, 
                                  RF=model_rf, 
                                  GBM=model_gbm))
 summary(models_compare)
@@ -859,24 +861,26 @@ scales <- list(x=list(relation="free"),
                y=list(relation="free"))
 bwplot(models_compare, scales=scales)
 
-# 3) building classification models
+#################################################
+# 2) building classification models for iris
+#################################################
+rm(list = ls())
 
-# the models from caret
-model_info <- getModelInfo()
-names(model_info)
-model_info[["rf"]]$parameters
-
-# A) loading and spliting data
+# A) loading and splitting data
 
 data(iris) 
 head(iris)
 
 set.seed(123)
-index <- createDataPartition(iris$Species, p=0.8, list=FALSE) # 
-train_data <- iris[index,]
-test_data <- iris[-index,]
+index_iris <- createDataPartition(iris$Species, p=0.8, list=FALSE) # 
+train_dat <- iris[index_iris,]
+test_dat <- iris[-index_iris,]
 
-# B) feature selection
+###############################################
+# skipping the whole B) and running the C)
+###############################################
+# B) training a model with diff optimal mtry
+# feature selection
 featurePlot(x = iris[, 1:4], y = iris$Species, plot = "density",
             scales = list(x = list(relation = "free"), y = list(relation="free")),
             pch = "|",
@@ -893,16 +897,15 @@ ctrl <- rfeControl(functions = rfFuncs,
 lmProfile <- rfe(x = iris[, 1:4], y = iris$Species, rfeControl = ctrl)
 lmProfile
 
-# C) training a model with rf
 # a. using default trainControl for optimal mtry
 # i.e. trainControl(method = "boot", number = 25)
 set.seed(123)
 rf_fit1 <- train(Species~., 
-                 data = train_data, 
+                 data = train_dat, 
                  method="rf")  
 
 # rf_fit1 <- train(Species~., 
-#                  data = train_data, 
+#                  data = train_dat, 
 #                  method="rf",
 #                  trControl = trainControl(method = "boot", 
 #                                           number = 25))  
@@ -910,87 +913,118 @@ rf_fit1 <- train(Species~.,
 rf_fit1
 plot(rf_fit1)
 
+# b. using self-defined trainControl for optimal mtry
 
-# b. using self-defined trainControl way for optimal mtry
 fitControl <- trainControl(method = "repeatedcv", number = 5, 
                            repeats=3) 
 
 set.seed(123)
-rf_fit2 <- train(Species ~ ., data = train_data, method = "rf",
+rf_fit2 <- train(Species ~ ., data = train_dat, method = "rf",
                  trControl = fitControl) 
 
 rf_fit2
 
-library(ModelMetrics)  
-library(MLmetrics)
 
-# c. self-defined optimal parameters
-fitControl <- trainControl(method = 'repeatedcv', number = 5, repeats =3,
+# c. self-defined tuneLength for optimal mtry
+fitControl <- trainControl(method = 'repeatedcv', 
+                           number = 5, 
+                           repeats =3,
                            savePredictions = 'final', # keep results
                            classProbs = TRUE, # prob values                
                            summaryFunction=multiClassSummary) # metrics
 
-rf_fit3 <- train(Species ~ ., data = train_data, method = "rf", 
+rf_fit3 <- train(Species ~ ., data = train_dat, method = "rf", 
                  tuneLength = 5, # optimal mtry
                  trControl = fitControl,
                  verbose = FALSE)
 
 rf_fit3
 
-# rf_pred <- predict(rf_fit3, test_data)
+# rf_pred <- predict(rf_fit3, test_dat)
 # rf_pred
-# caret::confusionMatrix(reference = test_data$Species, data = rf_pred, # 用test评估模型
+# caret::confusionMatrix(reference = test_dat$Species, 
+#                        data = rf_pred, # 用test评估模型
 #                        mode = "everything")
-# library(MLeval) 
-# x <- evalm(rf_fit3)
-# x$roc
+
+# d. self-defined tuneGrid for optimal mtry
+fitControl <- trainControl(method = 'repeatedcv', 
+                           number = 5, 
+                           repeats =3,
+                           savePredictions = 'final', # keep results
+                           classProbs = TRUE, # prob values                
+                           summaryFunction=multiClassSummary) # metrics
 
 tune_grid <- expand.grid(mtry = c(1, 2, 3, 4))
 set.seed(123) 
-rf_fit4 <- train(Species ~ ., data = train_data,  method = "rf",
+rf_fit4 <- train(Species ~ ., data = train_dat,  method = "rf",
                  tuneGrid = tune_grid,
                  trControl = fitControl,
                  metric = "Accuracy")
 rf_fit4
+##########################################################
 
-# d. adding data preProcess 
+# C) training a model with preProcess, trControl and optimal mtry
+
+fitControl <- trainControl(method = 'repeatedcv', 
+                           number = 5, 
+                           repeats =3,
+                           savePredictions = 'final', # keep results
+                           classProbs = TRUE, # prob values                
+                           summaryFunction=multiClassSummary) # metrics
+
 set.seed(123)
 rf_fit5 <- train(Species ~ .,
-                 data = train_data, 
+                 data = train_dat, 
                  method = "rf",
-                 preProcess = c("nzv", "center", "scale", "knnImpute", "BoxCox"),
+                 preProcess = c("nzv", "center", "scale", "knnImpute"),
                  na.action = na.pass, 
                  trControl = fitControl,
-                 tuneLength=5) 
+                 tuneLength=5,
+                 metric = "Accuracy") 
 rf_fit5
 
-# D) comparison of several algorithms
+# D) simultaneously running several algorithms for classification
 
 library(caretEnsemble)
+
 fitControl <- trainControl(
   method = "repeatedcv",
-  number = 10,
+  number = 5,
   repeats = 3,
-  savePredictions = TRUE,
-  classProbs = TRUE
+  savePredictions = "final", 
+  classProbs = TRUE # calculating ROC
 )
-
-algorithmList <- c('rf', 'rpart', 'gbm')
 
 set.seed(123)
-options(na.action = na.pass)
-models <- caretList(
+multi_models <- caretList(
   Species ~ ., 
-  data = train_data, 
+  data = train_dat, 
   trControl = fitControl,
-  methodList = algorithmList,
-  preProcess = c("nzv", "center", "scale", "knnImpute", "BoxCox")
+  methodList = c('ranger', 'rf',  'gbm'),
+  preProcess = c("nzv", "center", "scale", "knnImpute"),
+  tuneLength=3,
+  metric = "Accuracy"
 )
 
+names(multi_models)
+multi_models$rf
+
+# pred_rf <- multi_models$rf$pred
+# cm_rf <- confusionMatrix(data = pred_rf$pred, 
+#                          reference = pred_rf$obs)
+# print(cm_rf) 
+# 
+# pred_ranger <- multi_models$ranger$pred
+# cm_ranger <- confusionMatrix(data = pred_ranger$pred, 
+#                              reference = pred_ranger$obs)
+# print(cm_ranger)
+
 # Resample results
-results <- resamples(models)
-summary(results)
+resamples_list <- resamples(multi_models)
+summary(resamples_list)
+dotplot(resamples_list, metric = "Accuracy")
 
 # Plot the results
-scales <- list(x = list(relation = "free"), y = list(relation = "free"))
-bwplot(results, scales = scales)
+
+bwplot(resamples_list)
+
