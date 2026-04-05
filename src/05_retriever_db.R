@@ -290,7 +290,7 @@ doubsdata <- DBI::dbConnect(RPostgreSQL::PostgreSQL(), # connect
                           host = 'localhost',
                           port = 5432,
                           user = 'doubs',
-                          password = 'xxxx')
+                          password = 'doubs')
 
 doubsdata
 dbGetInfo(doubsdata)
@@ -312,6 +312,11 @@ dbWriteTable(conn = doubsdata,
              row.names = FALSE,
              overwrite = TRUE)
 
+dbWriteTable(conn = doubsdata,
+             name = "doubs_spa",
+             value = SPA,
+             row.names = FALSE,
+             overwrite = TRUE)
 
 dbListFields(doubsdata, "doubs_env") # List fields of the table
 
