@@ -15,42 +15,62 @@ rm(list = ls()) # Remove all variables
 ##############################################
 # A) least square algorithm (statistic model)
 
-x <- c(100,120,140,160,180,200,220,240,260,280)
-y <- c(55,60,62,64,68,70,80,85,90,95)
+x1 <- c(100,120,140,160,180,200,220,240,260,280)
+y1 <- c(55,60,62,64,68,70,80,85,90,95)
 df1 <- data.frame(x,y)
 df1
 
-plot(y ~ x)
-abline(lm(y ~ x)) # check linear model
+plot(y1 ~ x1)
+abline(lm(y1 ~ x1)) # check linear model
 
-boxplot(x, main="x", sub=paste("Outlier rows: ", # check the outliers
-                               boxplot.stats(x)$out))
-boxplot(y, main="y", sub=paste("Outlier rows: ",
-                               boxplot.stats(y)$out))
+boxplot(x1, main="x", sub=paste("Outlier rows: ", # check the outliers
+                               boxplot.stats(x1)$out))
+boxplot(y1, main="y", sub=paste("Outlier rows: ",
+                               boxplot.stats(y1)$out))
 
 library(e1071) # check whether the data meet normality distrib
-plot(density(x), main = "Density Plot: x", ylab = "Frequency",
-     sub= paste("Skewness: ", round(e1071::skewness(y), 2)))
-plot(density(y), main = "Density Plot: y", ylab = "Frequency",
-     sub= paste("Skewness: ", round(e1071::skewness(y), 2)))
+plot(density(x1), main = "Density Plot: x", ylab = "Frequency",
+     sub= paste("Skewness: ", round(e1071::skewness(x1), 2)))
+plot(density(y1), main = "Density Plot: y", ylab = "Frequency",
+     sub= paste("Skewness: ", round(e1071::skewness(y1), 2)))
 
-linearMod <- lm(y ~ x, data = df1)  # build a linear model
-print(linearMod)
-summary(linearMod) # examine the significance
+lm_model1 <- lm(y1 ~ x1, data = df1)  # build a linear model
+print(lm_model1)
+summary(lm_model1) # examine the significance
+
+
+# if the dataset is df3, building a statistic model 
+# may not be suitable
+
+x2 <- c(84, 100, 180, 253, 264, 286, 400, 130, 480, 1000, 
+       1990, 2000, 2110, 2120, 2300, 1610, 2430, 2500, 2590, 2680,
+       2720, 2790,2880, 2976, 3870, 3910, 3960, 4320, 6670, 6900)
+y2 <- c(6.176, 3.434, 3.683, 3.479, 3.178, 3.497, 4.205, 3.258,
+       2.565, 4.605, 3.783, 2.833, 3.091, 2.565, 1.792, 3.045, 1.792,
+       2.197, 1.792, 2.197, 2.398, 2.708, 2.565, 1.386, 1.792,
+       1.792, 2.565, 1.386, 1.946, 1.099)
+
+df2 <- data.frame(x2, y2)
+plot(y2 ~ x2, df2)
+abline(lm(y2 ~ x2))
+
+lm_model2 <- lm(y2 ~ x2, data = df2)  # build a linear model
+print(lm_model2)
+summary(lm_model2) # examine the significance
 
 # B) gradient descent algorithm (machine learning) 
 
-x <- c(100,120,140,160,180,200,220,240,260,280)
-x_mean <- mean(x) # standardizing the data
-x_sd <- sd(x)
-x_std <- (x - x_mean) / x_sd
+x1 <- c(100,120,140,160,180,200,220,240,260,280)
+x1_mean <- mean(x1) # standardizing the data
+x1_sd <- sd(x1)
+x1_std <- (x1 - x1_mean) / x1_sd
 
-X <- cbind(1,x_std) # # add a column of 1's as intercept
+X <- cbind(1,x1_std) # # add a column of 1's as intercept
 
-y <- c(55,60,62,64,68,70,80,85,90,95)
+y1 <- c(55,60,62,64,68,70,80,85,90,95)
 
-cost <- function(X, y, theta){ # cost function
-  sum((X %*% theta -y)^2/2*length(y))
+cost <- function(X, y1, theta){ # cost function
+  sum((X %*% theta -y1)^2/2*length(y1))
 }
 
 
@@ -63,36 +83,170 @@ theta_history <- list(num_iters)
 theta <- matrix(c(0,0), nrow = 2) # initialize coefficients
 
 for(i in 1:num_iters){ # gradient descent
-  error <- (X %*% theta - y)
-  delta <- t(X) %*% error / length(y)
+  error <- (X %*% theta - y1)
+  delta <- t(X) %*% error / length(y1)
   theta <- theta - alpha * delta
-  cost_history[i] <- cost(X, y, theta)
+  cost_history[i] <- cost(X, y1, theta)
   theta_history[[i]] <- theta
 }
 
 print(theta)
 
-plot(x_std, y, main = "Linear regression by gradient descent")
+plot(x1_std, y1, main = "Linear regression by gradient descent")
 
 for (i in c(1,3,6,10,14,seq(50,num_iters,by=50))) {
   abline(coef=theta_history[[i]])
 }
 abline(coef=theta, col='red')
 
+
 #################################################
 ## 02-CRAT for classification and regression
 #################################################
-# A) CRAT for classification
+## 1) CART for regression
 # https://medium.com/@justindixon91/decision-trees-afc984d161bf
 # https://www.causalmlbook.com/classification-and-regression-trees-cart.html
+
+x1 <- c(100,120,140,160,180,200,220,240,260,280)
+y1 <- c(55,60,62,64,68,70,80,85,90,95)
+df1 <- data.frame(x1, y1)
+plot(x1, y1, pch = 21)
+
+# A) the CART algorithm principle
+
+# defined MSE function
+mse_split <- function(x, y, s){
+  left <- y[x < s]
+  right <- y[x >= s]
+  
+  if(length(left)==0 || length(right)==0) return(Inf)
+  
+  mean_left <- mean(left)
+  mean_right <- mean(right)
+  
+  sum((left - mean_left)^2) + sum((right - mean_right)^2)
+}
+
+# first split candidates（for all x1 and y1 values）
+splits <- sort(unique(x1))
+
+# calculate MSE for each split
+mse_values <- sapply(splits, function(s) mse_split(x1, y1, s))
+
+# finding the best split
+best_s <- splits[which.min(mse_values)]
+best_s
+
+c1 <- mean(y1[x1 < best_s])   
+c2 <- mean(y1[x1 >= best_s])  
+
+plot(x1, y1, pch = 21, bg = "lightblue")
+lines(c(min(x1), best_s, best_s, max(x1)),
+      c(c1, c1, c2, c2),
+      col = "red", lwd = 2)
+abline(v = best_s, col = "blue", lty = 2)
+
+# second split candidates (for left and right)
+left_x <- x1[x1 < best_s]
+left_y <- y1[x1 < best_s]
+splits_left <- sort(unique(left_x))
+mse_values_left <- sapply(splits_left, function(s) mse_split(left_x, left_y, s))
+best_s_left <- splits_left[which.min(mse_values_left)]
+c1_left <- mean(left_y[left_x < best_s_left])  
+c2_left <- mean(left_y[left_x >= best_s_left]) 
+
+right_x <- x1[x1 >= best_s]
+right_y <- y1[x1 >= best_s]
+splits_right <- sort(unique(right_x))
+mse_values_right <- sapply(splits_right, function(s) mse_split(right_x, right_y, s))
+best_s_right <- splits_right[which.min(mse_values_right)]
+c1_right <- mean(right_y[right_x < best_s_right])  
+c2_right <- mean(right_y[right_x >= best_s_right]) 
+
+plot(x1, y1, pch = 21, bg = "lightblue")
+
+lines(c(min(x1), best_s, best_s, max(x1)),
+      c(c1, c1, c2, c2),
+      col = "red", lwd = 2)
+
+lines(c(min(left_x), best_s_left, best_s_left, max(left_x)),
+      c(c1_left, c1_left, c2_left, c2_left),
+      col = "green", lwd = 2)
+
+lines(c(min(right_x), best_s_right, best_s_right, max(right_x)),
+      c(c1_right, c1_right, c2_right, c2_right),
+      col = "blue", lwd = 2)
+
+abline(v = c(best_s, best_s_left, best_s_right), col = "blue", lty = 2)
+
+# B) building a tree using the tree package
+
+library(tree)
+
+tree_model <- tree(
+  y1 ~ x1,
+  control = tree.control(length(y1), mincut = 1, minsize = 2)
+)
+
+summary(tree_model)
+tree_model
+tree_model$frame
+plot(tree_model)
+text(tree_model)
+
+z <- seq(min(x1), max(x1), length = 200)
+y_pred <- predict(tree_model, newdata = data.frame(x1 = z))
+plot(x1, y1, pch = 21, bg = "lightblue")
+lines(z, y_pred, type = "s", col = "red", lwd = 2)
+
+# C) building a tree using the rpart package
+# data and plot
+x2 <- c(84, 100, 180, 253, 264, 286, 400, 130, 480, 1000, 
+       1990, 2000, 2110, 2120, 2300, 1610, 2430, 2500, 2590, 2680,
+       2720, 2790,2880, 2976, 3870, 3910, 3960, 4320, 6670, 6900)
+y2 <- c(6.176, 3.434, 3.683, 3.479, 3.178, 3.497, 4.205, 3.258,
+       2.565, 4.605, 3.783, 2.833, 3.091, 2.565, 1.792, 3.045, 1.792,
+       2.197, 1.792, 2.197, 2.398, 2.708, 2.565, 1.386, 1.792,
+       1.792, 2.565, 1.386, 1.946, 1.099)
+
+df2 <- data.frame(x2, y2)
+plot(x2, y2, pch=21)
+
+# the first point for partitioning
+library(tree)
+thresh <- tree(y2 ~ x2)
+print(thresh)
+a <- mean(y2[x2<2115])
+b <- mean(y2[x2>=2115])
+lines(c(80, 2115, 2115, 7000),
+      c(a, a, b, b))
+
+lines(c(80, 2115, 2115, 7000), 
+      c(a, a, b, b), col = "white", lwd = 2) 
+
+# the final tree
+
+tree_model <- tree(y2 ~ x2)
+z <- seq(80, 7000)
+y2 <- predict(tree_model, list(x2 =z))
+lines(z, y2)
+
+tree_regres <- rpart(y2 ~ ., data = df2, method = "anova", 
+                     control = rpart.control(minsplit = 10))
+print(tree_regres)
+
+rpart.plot(tree_regres,main = "Regression Tree")
+
+# 2) using CRAT algorithm for classification
+# A) the CART algorithm priciple for classification
 
 y <- c(0,0,1,0,1,2,2,2,2,2) # 3 class vector
 x1 <- c(0.6,0.8,1.2,1.3,1.7,2.3,2.5,2.9,3.1,3.2) # feature1
 x2 <- c(0.8,1.8,2.7,0.4,2.2,0.7,2.4,1.6,2.1,0.2) # feature2
-df2 <- data.frame(y, x1, x2) 
-df2
+df3 <- data.frame(y, x1, x2) 
+df3
 
-df2 <- df2 %>%
+df3 <- df3 %>%
   mutate(pch_vals = case_when(
     y == 0 ~ 16,    # 16 = solid circle
     y == 1 ~ 2,    # 17 = triangle
@@ -100,7 +254,7 @@ df2 <- df2 %>%
   ))
 
 # Plot with different shapes based on `pch_vals`
-plot(df2$x1, df2$x2,
+plot(df3$x1, df3$x2,
      pch = df2$pch_vals, lwd = 2,
      ylab = "x2", xlab = "x1")
 
@@ -160,93 +314,21 @@ Predictor2test_gini
 ggplot(data = Predictor2test_gini, aes(x = Predictor2test, y = Gini)) +
   geom_line() 
 
-# train a classification tree using rpart
+# B) training a classification tree using rpart
 library(rpart)
-tree_class = rpart(y ~ ., data = df2, method = "class", 
+tree_class = rpart(y ~ ., data = df3, method = "class", 
                    control = rpart.control(minsplit = 2))
 print(tree_class)
 summary(tree_class)
 library(rpart.plot)
 rpart.plot(tree_class, main = "Classification Tree")
 
-## B) CART for regresssion
-# data and plot
-x <- c(84, 100, 180, 253, 264, 286, 400, 130, 480, 1000, 
-       1990, 2000, 2110, 2120, 2300, 1610, 2430, 2500, 2590, 2680,
-       2720, 2790,2880, 2976, 3870, 3910, 3960, 4320, 6670, 6900)
-y <- c(6.176, 3.434, 3.683, 3.479, 3.178, 3.497, 4.205, 3.258,
-       2.565, 4.605, 3.783, 2.833, 3.091, 2.565, 1.792, 3.045, 1.792,
-       2.197, 1.792, 2.197, 2.398, 2.708, 2.565, 1.386, 1.792,
-       1.792, 2.565, 1.386, 1.946, 1.099)
-
-df3 <- data.frame(x, y)
-plot(x, y, pch=21)
-
-# the first point for partitioning
-library(tree)
-thresh <- tree(y ~ x)
-print(thresh)
-a <- mean(y[x<2115])
-b <- mean(y[x>=2115])
-lines(c(80, 2115, 2115, 7000),
-      c(a, a, b, b))
-
-lines(c(80, 2115, 2115, 7000), 
-      c(a, a, b, b), col = "white", lwd = 2) 
-
-# the final tree
-
-model <- tree(y ~ x)
-z <- seq(80, 7000)
-y <- predict(model, list(x =z))
-lines(z, y)
-
-tree_regres <- rpart(y ~ ., data = df3, method = "anova", 
-                      control = rpart.control(minsplit = 10))
-print(tree_regres)
-
-rpart.plot(tree_regres,main = "Regression Tree")
-
 ######################################################
 ## 03- Ensemble Learning for classification and regression
 ######################################################
-# 1) Bagging algorithm for classification
+# 1) Bagging algorithm 
 
-# classification for the df2
-y <- c(0, 0, 1, 0, 1, 2, 2, 2, 2, 2)  # labels
-x1 <- c(0.6, 0.8, 1.2, 1.3, 1.7, 2.3, 2.5, 2.9, 3.1, 3.2)  # feature1
-x2 <- c(0.8, 1.8, 2.7, 0.4, 2.2, 0.7, 2.4, 1.6, 2.1, 0.2)  # feature2
-df2 <- data.frame(y, x1, x2)
-
-# 
-clr <- c("pink", "red", "blue", "yellow", "darkgreen",
-         "orange", "brown", "purple", "darkblue")
-
-n <- nrow(df2)
-
-# set layout of 3x3 
-par(mfrow = c(3, 3))
-
-# training 9 trees (B = 9)
-for(i in 1:9) {
-  set.seed(123) 
-  idx <- sample(n, n, replace = TRUE)  # Bootstrap sampling
-  tr <- df2[idx, ]
-  
-  cart <- rpart(
-    y ~ x1 + x2,
-    data = tr,  
-    method = "class", 
-    control = rpart.control(minsplit = 2),
-    cp = 0  # unpruned
-  )
-  
-  prp(cart, box.col = clr[i])
-}
-
-par(mfrow = c(1, 1))
-
-# Bagging algorithm for regression
+# A) for regression
 
 library(ggplot2)
 library(caret) # evaluation performance
@@ -284,7 +366,46 @@ ggplot(mtcars, aes(x = mpg, y = bagging_pred)) +
   ggtitle("Bagging Model: Actual vs Predicted MPG") +
   theme_minimal()
 
+# B) for classification
+
+# classification for the df2
+y <- c(0, 0, 1, 0, 1, 2, 2, 2, 2, 2)  # labels
+x1 <- c(0.6, 0.8, 1.2, 1.3, 1.7, 2.3, 2.5, 2.9, 3.1, 3.2)  # feature1
+x2 <- c(0.8, 1.8, 2.7, 0.4, 2.2, 0.7, 2.4, 1.6, 2.1, 0.2)  # feature2
+df3 <- data.frame(y, x1, x2)
+
+# 
+clr <- c("pink", "red", "blue", "yellow", "darkgreen",
+         "orange", "brown", "purple", "darkblue")
+
+n <- nrow(df3)
+
+# set layout of 3x3 
+par(mfrow = c(3, 3))
+
+# training 9 trees (B = 9)
+for(i in 1:9) {
+  set.seed(123) 
+  idx <- sample(n, n, replace = TRUE)  # Bootstrap sampling
+  tr <- df2[idx, ]
+  
+  cart <- rpart(
+    y ~ x1 + x2,
+    data = tr,  
+    method = "class", 
+    control = rpart.control(minsplit = 2),
+    cp = 0  # unpruned
+  )
+  
+  prp(cart, box.col = clr[i])
+}
+
+par(mfrow = c(1, 1))
+
+
 # 2) randomforest algorithm
+
+# A) for regression
 
 library(randomForest)
 set.seed(123) 
@@ -303,8 +424,9 @@ ggplot(mtcars, aes(x = mpg, y = rf_pred)) +
   ggtitle("Random Forest: Actual vs Predicted MPG") +
   theme_minimal()
 
+# for classification
 
-## 3) the "boosting tree" for regression
+# 3) the "boosting tree" for regression
 # A) run one round by one round to understand the "boosting"
 
 library(tree) # calculating residuals in decision tree 
@@ -395,7 +517,7 @@ for (i in 2:nrounds){
 
 results
 
-# C) compare the boosting algorithm to tree and rf models
+# 4) compare the boosting algorithm to tree and rf models
 # tree model
 tree_mdl <-eval(parse(text = paste0("tree(mpg~", x_vars, ", 
                                     data=df4)")))
@@ -722,9 +844,9 @@ ggplot(results_long, aes(x = Actual, y = Prediction, color = Model)) +
        x = "Actual MPG", y = "Predicted MPG") +
   theme(legend.position = "top")
 
-##########################################
+#############################################
 ## 05-build machine learning models by caret
-##########################################
+#############################################
 # https://r.qcbs.ca/workshop04/book-en/multiple-linear-regression.html
 rm(list = ls())
 
@@ -743,12 +865,11 @@ modelLookup("gbm")
 
 # A) load and split data 
 data("mtcars")
-df5 <- mtcars
 
 set.seed(123)
-Index <- createDataPartition(df5$mpg, p = 0.8, list = FALSE) 
-train <- df5[Index,]
-test <- df5[-Index,]
+Index <- createDataPartition(mtcars$mpg, p = 0.7, list = FALSE) 
+train <- mtcars[Index,]
+test <- mtcars[-Index,]
 
 # # B) pre-Processing the data setting for training
 ##########################################################
@@ -758,8 +879,11 @@ test <- df5[-Index,]
 
 library(tidyverse)
 dmy <- dummyVars(~ ., data = train)
-train_dmy <- predict(dmy, train) %>% as.data.frame()
-test_dmy  <- predict(dmy, test) %>% as.data.frame()
+train_dmy <- predict(dmy, train) %>% 
+  as.data.frame()
+class(train_dmy)
+test_dmy  <- predict(dmy, test) %>% 
+  as.data.frame()
 
 # b. impute missing and center/scale 
 
@@ -802,6 +926,14 @@ fitControl <- trainControl(method = "repeatedcv",
 ##############################################################
 # C) training and evaluating models with caret
 # a. a tree model
+
+data("mtcars")
+
+set.seed(123)
+Index <- createDataPartition(mtcars$mpg, p = 0.7, list = FALSE) 
+train <- mtcars[Index,]
+test <- mtcars[-Index,]
+
 
 fitControl <- trainControl(method = "repeatedcv",   
                            number = 5,     # number of folds
@@ -934,7 +1066,7 @@ fitControl <- trainControl(method = 'repeatedcv',
                            summaryFunction=multiClassSummary) # metrics
 
 rf_fit3 <- train(Species ~ ., data = train_dat, method = "rf", 
-                 tuneLength = 5, # optimal mtry
+                 tuneLength = 3, # optimal mtry
                  trControl = fitControl,
                  verbose = FALSE)
 
@@ -1022,9 +1154,8 @@ multi_models$rf
 # Resample results
 resamples_list <- resamples(multi_models)
 summary(resamples_list)
-dotplot(resamples_list, metric = "Accuracy")
 
 # Plot the results
 
+dotplot(resamples_list, metric = "Accuracy")
 bwplot(resamples_list)
-
