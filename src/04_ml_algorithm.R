@@ -387,7 +387,7 @@ par(mfrow = c(3, 3))
 for(i in 1:9) {
   set.seed(123) 
   idx <- sample(n, n, replace = TRUE)  # Bootstrap sampling
-  tr <- df2[idx, ]
+  tr <- df3[idx, ]
   
   cart <- rpart(
     y ~ x1 + x2,
@@ -401,7 +401,6 @@ for(i in 1:9) {
 }
 
 par(mfrow = c(1, 1))
-
 
 # 2) randomforest algorithm
 
@@ -1159,3 +1158,172 @@ summary(resamples_list)
 
 dotplot(resamples_list, metric = "Accuracy")
 bwplot(resamples_list)
+
+##########################################
+## 06-visualizing machine learning models
+##########################################
+data(mtcars)
+head(mtcars)
+set.seed(123)
+idx <- createDataPartition(mtcars$mpg, p=0.8, list = FALSE)
+train <- mtcars[idx, ]
+test  <- mtcars[-idx, ]
+train_control <- trainControl(method="cv", number=3)
+
+# 1) training and visualizing models
+
+# A) linear regression model
+
+library(caret)
+caret_lm_mdl <- train(mpg ~ wt, data = train, method = "lm",
+                      trControl = train_control)
+print(caret_lm_mdl)
+pred <- predict(caret_lm_mdl, test)
+rmse <- RMSE(test$mpg, pred) # Root Mean Squared Error
+R2 <- R2(test$mpg, pred)
+
+plot(mtcars$wt, mtcars$mpg, main="caret_lm Models")
+abline(stat_lm_mdl, col="blue")
+
+# B) a decision tree regression
+# a. training and retraining with optimal cp
+library(caret)
+rpart_mdl <- train(
+  mpg ~ wt,
+  data = train,
+  method = "rpart",
+  trControl = train_control,
+  tuneLength = 10,              
+  control = rpart.control(minsplit = 2)
+)
+
+print(rpart_mdl)
+plot(rpart_mdl)
+
+best_cp <- rpart_mdl$bestTune$cp
+best_cp
+
+final_rpart_mdl <- train(
+  mpg ~ wt,
+  data = train,
+  method = "rpart",
+  trControl = trainControl(method = "none"),  # not necessary
+  tuneGrid = data.frame(cp = best_cp),       # fix cp
+  control = rpart.control(minsplit = 2)
+)
+
+# b. visualizing the tree diagram 
+library(rpart.plot)
+rpart.plot(
+  final_rpart_mdl$finalModel,
+  type = 2,       
+  extra = 101,   
+  under = TRUE   
+)
+
+# c. visualizing the step plot 
+wt_grid <- seq(min(train$wt), max(train$wt), length.out = 200)
+pred <- predict(final_rpart_mdl$finalModel, 
+                newdata = data.frame(wt = wt_grid))
+plot(train$wt, train$mpg,
+     pch = 16, col = "blue",
+     xlab = "wt", ylab = "mpg",
+     main = "Regression Tree as Step Function")
+
+lines(wt_grid, pred, type = "s", col = "red", lwd = 2)
+
+# C) random forest 
+# a. training a rf model
+rf_mdl <- train(mpg ~ wt, data = train, method = "rf")  # mtry
+print(rf_mdl)
+
+# b. visualizing individual trees
+library(rpart)
+library(rpart.plot)  # prp()
+
+n <- nrow(train)
+clr <- rainbow(6) 
+par(mfrow = c(2,3))
+
+# for the front 6 trees
+for(i in 1:6) {
+  set.seed(123 + i) 
+  idx <- sample(n, n, replace = TRUE)  # Bootstrap sample
+  tr <- df[idx, ]
+
+  cart <- rpart(
+    mpg ~ wt,          
+    data = tr,  
+    method = "anova",  
+    control = rpart.control(minsplit = 2),
+    cp = 0             
+  )
+  
+  prp(cart, box.col = clr[i], main = paste("Tree", i))
+}
+
+par(mfrow = c(1,1))
+
+# c. visualizing the smooth curve
+
+wt_grid <- seq(min(train$wt), max(train$wt), length.out = 200)
+rf_pred <- predict(rf_mdl, newdata = data.frame(wt = wt_grid))
+
+plot(train$wt, train$mpg, pch = 16)
+lines(wt_grid, rf_pred, lwd = 2)
+
+# D) boosting tree
+# a. training and retraining the model
+library(caret)
+library(gbm)  
+
+tuneGrid = expand.grid(
+  interaction.depth = c(1, 2),
+  n.trees = c(50, 100),
+  shrinkage = c(0.05, 0.1),
+  n.minobsinnode = c(2, 3, 5)  
+)
+
+set.seed(123)
+gbm_mdl <- train(mpg ~ wt, data = train, method = "gbm",
+  trControl = train_control,
+  tuneGrid = tuneGrid,
+  bag.fraction = 0.8,   # 或 1
+  verbose = FALSE
+)
+
+print(gbm_mdl)
+plot(gbm_mdl)       
+gbm_mdl$bestTune
+
+gbm_final <- train(mpg ~ wt, data = train, method = "gbm",
+  trControl = trainControl(method = "none"), # 
+  tuneGrid = gbm_mdl$bestTune,
+  verbose = FALSE)
+
+# b. visualizing the smooth curve
+
+wt_grid <- seq(min(train_clean$wt), max(train_clean$wt), length.out = 200)
+pred <- predict(gbm_final, newdata = data.frame(wt = wt_grid))
+plot(train_clean$wt, train_clean$mpg, pch = 16, col = "blue",
+     xlab = "Weight (wt)", ylab = "MPG",
+     main = "Boosted Regression Tree (GBM) Fit")
+lines(wt_grid, pred, col = "red", lwd = 2)
+
+# 2) the variable importance and effects
+importance(rf_model)
+varImpPlot(rf_model)
+
+library(pdp)
+partial(rf_model, pred.var = "wt", plot = TRUE)
+partial(rf_model, pred.var = c("wt","hp"), plot = TRUE)
+
+# 3) evaluating and selecting models 
+pred <- predict(rf_model, mtcars)
+plot(mtcars$mpg, pred)
+abline(0,1,col="red") # y = x, 1 = slope
+
+# residual analysis to examine if captured
+residuals <- mtcars$mpg - pred
+plot(pred, residuals) # random distribution 
+abline(h=0,col="red") 

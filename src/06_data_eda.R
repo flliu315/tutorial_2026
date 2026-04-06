@@ -437,3 +437,4 @@ plot(env_spe_rda_pars,
      main = "Scaling 2:  species-environment") # Scaling 2
 # env_spe4_sc <- scores(env_spe_rda_pars, choices = 1:2, display = "sp")
 # arrows(0, 0, env_spe4_sc[,1], env_spe4_sc[,2], length = 0, lty = 1, col = "red")
+
