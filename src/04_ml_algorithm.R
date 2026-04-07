@@ -1272,7 +1272,7 @@ rf_pred <- predict(rf_mdl, newdata = data.frame(wt = wt_grid))
 plot(train$wt, train$mpg, pch = 16)
 lines(wt_grid, rf_pred, lwd = 2)
 
-# D) boosting tree
+# D) a boosting tree
 # a. training and retraining the model
 library(caret)
 library(gbm)  
@@ -1303,27 +1303,38 @@ gbm_final <- train(mpg ~ wt, data = train, method = "gbm",
 
 # b. visualizing the smooth curve
 
-wt_grid <- seq(min(train_clean$wt), max(train_clean$wt), length.out = 200)
+wt_grid <- seq(min(train$wt), max(train$wt), length.out = 200)
 pred <- predict(gbm_final, newdata = data.frame(wt = wt_grid))
-plot(train_clean$wt, train_clean$mpg, pch = 16, col = "blue",
+plot(train$wt, train$mpg, pch = 16, col = "blue",
      xlab = "Weight (wt)", ylab = "MPG",
      main = "Boosted Regression Tree (GBM) Fit")
 lines(wt_grid, pred, col = "red", lwd = 2)
 
-# 2) the variable importance and effects
-importance(rf_model)
-varImpPlot(rf_model)
+# drawing all curves on a map
+wt_grid <- seq(min(train$wt), max(train$wt), length.out = 200)
+newdata <- data.frame(wt = wt_grid)
 
-library(pdp)
-partial(rf_model, pred.var = "wt", plot = TRUE)
-partial(rf_model, pred.var = c("wt","hp"), plot = TRUE)
+pred_lm    <- predict(lm_mdl, newdata)
+pred_rpart <- predict(rpart_mdl, newdata)
+pred_rf    <- predict(rf_mdl, newdata)
+pred_gbm   <- predict(gbm_mdl, newdata)
 
-# 3) evaluating and selecting models 
-pred <- predict(rf_model, mtcars)
-plot(mtcars$mpg, pred)
-abline(0,1,col="red") # y = x, 1 = slope
+plot(train$wt, train$mpg,
+     pch = 16, col = "black",
+     xlab = "wt", ylab = "mpg",
+     main = "LM vs rpart vs RF vs GBM")
 
-# residual analysis to examine if captured
-residuals <- mtcars$mpg - pred
-plot(pred, residuals) # random distribution 
-abline(h=0,col="red") 
+lines(wt_grid, pred_rpart, type = "s",  col = "black",lwd = 2)
+lines(wt_grid, pred_rf, col = "blue", lwd = 2, lty = 2)
+lines(wt_grid, pred_lm,  col = "darkgreen", lwd = 2, lty = 3)
+lines(wt_grid, pred_gbm,  col = "red", lwd = 2, lty = 4)
+legend("topright",
+       legend = c("Data",
+                  "rpart (step)",
+                  "Random Forest",
+                  "Linear Model",
+                  "GBM"),
+       col = c("black", "black", "blue", "darkgreen", "red"),
+       pch = c(16, NA, NA, NA, NA),
+       lty = c(NA, 1, 2, 3, 4),
+       lwd = 2)
