@@ -1183,7 +1183,7 @@ rmse <- RMSE(test$mpg, pred) # Root Mean Squared Error
 R2 <- R2(test$mpg, pred)
 
 plot(mtcars$wt, mtcars$mpg, main="caret_lm Models")
-abline(stat_lm_mdl, col="blue")
+abline(caret_lm_mdl, col="blue")
 
 # B) a decision tree regression
 # a. training and retraining with optimal cp

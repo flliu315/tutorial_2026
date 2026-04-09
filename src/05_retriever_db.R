@@ -83,34 +83,14 @@ main <- read.csv("data/portal/5603981")
 library(tidyverse)
 glimpse(main)
 
-# download('harvard-forest', 'data/data_db') # vector [162]
-# unzip("data/data_db/hf110-01-gis.zip")
+# download('harvard-forest', 'data') # vector [162]
+# unzip("data/hf110-01-gis.zip")
 # 
 # library(sf)
-# sf <- st_read(unzip("data/data_db/hf110-01-gis.zip", #read .shp into R
+# sf <- st_read(unzip("data/hf110-01-gis.zip", #read .shp into R
 #                     "Harvard_Forest_Properties_GIS_Layers/stands_1937.shp"))
 
-# B) download.file() or read_csv() from websites
-# https://www.davidzeleny.net/anadat-r/doku.php/en:data:doubs
-
-# Set the base URL for the datasets
-
-base_url <- "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/"
-
-datasets <- c("DoubsSpe.csv","DoubsEnv.csv","DoubsSpa.csv")  # List of datasets 
-
-# Download each dataset
-
-for(dataset in datasets) {
-  full_url <- paste0(base_url, dataset) # full URL of files
-  dest_file <- file.path("data/", dataset) # the destination
-  download.file(full_url, destfile = dest_file, mode = "wb") # Download
-  cat("Downloaded:", dataset, "\n") # Print a message for complete
-}
-
-# if getting an error, check DNS (sudo vim /etc/resolv.conf)
-
-# C) get data from web APIs
+# B) get data from web APIs
 
 library(httr2)
 response <- request("https://api.gbif.org/v1/occurrence/search") %>%
@@ -140,19 +120,41 @@ df_key <- df[, c(
 
 str(df_key)
 
-#####################################################
-# 02- loading and saving data from the R environment
-#####################################################
+# # C) download.file() from websites
+# # https://www.davidzeleny.net/anadat-r/doku.php/en:data:doubs
+# 
+# # Set the base URL for the datasets
+# 
+# base_url <- "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/"
+# 
+# datasets <- c("DoubsSpe.csv","DoubsEnv.csv","DoubsSpa.csv")  # List of datasets 
+# 
+# # Download each dataset
+# 
+# for(dataset in datasets) {
+#   full_url <- paste0(base_url, dataset) # full URL of files
+#   dest_file <- file.path("data/", dataset) # the destination
+#   download.file(full_url, destfile = dest_file, mode = "wb") # Download
+#   cat("Downloaded:", dataset, "\n") # Print a message for complete
+# }
+# 
+# # if getting an error, check DNS (sudo vim /etc/resolv.conf)
 
-Env <- read.csv("data/DoubsEnv.csv")
-Spe <- read.csv("data/DoubsSpe.csv")
+#####################################################
+# 02- loading and saving data from local computer
+#####################################################
+data(doubs, package = 'ade4')
+
+Env <- doubs$env
+Spe <- doubs$fish
 write.csv(Env, "data/Env.csv", row.names = FALSE)
 write.csv(Spe, "data/Spe.csv", row.names = FALSE)
+Env_csv <- read.csv("data/Env.csv")
 
 saveRDS(Env, "data/Env.rds")
 saveRDS(Spe, "data/Spe.rds")
-Env <- readRDS("data/Env.rds")
-Spe <- readRDS("data/Spe.rds")
+Env_rds <- readRDS("data/Env.rds")
+Spe_rds <- readRDS("data/Spe.rds")
 
 
 #####################################################
@@ -166,42 +168,32 @@ Spe <- readRDS("data/Spe.rds")
 # sudo apt-get install libsqlite3-dev 
 # sudo apt-get install sqlitebrowser
 
-# A) exporting data to a sqlite db by DB brower
+# A) working on data with a sqlite db by DB brower
 
 # importing Env and Spe into a sqlite
-# a. creating a sqlite such as doubs.sqlite
-# b. File → Import → Table from CSV
+# a. open DB browser
+# b. creating a sqlite such as doubs.sqlite
+# c. File → Import → Table from CSV
 
 # exporting Env and Spe from the sqlite
 # a. open DB brower
 # b. File → Export → Table(s) as CSV
 # c. specifying the folder and file name
 
-# B) exporting data to a sqlite db using R code
+# B) working on data with a sqlite db
 # https://caltechlibrary.github.io/data-carpentry-R-ecology-lesson/05-r-and-databases.html
 
-library(tidyverse) # for the read_csv()
-SPE <- read_csv("data/Spe.csv")
-ENV <- read_csv("data/Env.csv")
+file.remove("data/DOUBS.sqlite")
 
+# a. connecting or creating db with RSQlite
 
-# connecting or creating db with dplyr
 library(DBI)
-library(dplyr) 
-# create a database by src_sqlite()
-my_db <- dplyr::src_sqlite("data/DOUBS.sqlite", 
-                           create = TRUE)
-my_db
+library(RSQLite)
 
-# copying the data.frames into the empty database
-copy_to(my_db, SPE, temporary = FALSE)
-copy_to(my_db, ENV, temporary = FALSE)
-my_db
+con <- dbConnect(RSQLite::SQLite(), 
+                 "data/DOUBS.sqlite") # connecting or creating
 
-dbDisconnect(my_db$con)
-my_db$con
-
-# C) Connecting to RStudio using R code or rstdudio pane
+# b. connecting to RStudio using rstdudio pane
 
 # https://www.youtube.com/watch?v=id0GX4sXnyI
 # https://www.youtube.com/watch?v=0euy9b3CjuY
@@ -216,23 +208,22 @@ my_db$con
 # vim /etc/odbcinst.ini
 # vim /etc/odbc.ini
 
-con <- DBI::dbConnect(RSQLite::SQLite(), # create a connect
-                        "data/DOUBS.sqlite")
-library(dbplyr)
-dbplyr::src_dbi(con) # view the database
+# c. manipulating data with a sqlite db using R code
 
-dbListTables(con)
-dbListFields(con, "ENV")
+dbListTables(con) 
+dbWriteTable(con, "Env_sqlite", Env, overwrite = TRUE) # importing
 
-# creating tables and inserting data by dbplyr
+library(tidyverse) # working on data with dplyr in database
+Env_tbl <- tbl(con, "Env_sqlite")
+Env_tbl
 
-env <- dplyr::tbl(con, "ENV") # Querying table
-head(env)
-library(tidyverse)
-env_clean <- env |>
-  select(-X) |>
-  collect() # load into the R session
-env_clean 
+Env_tbl_sel <- Env_tbl %>% 
+  filter(dfs > 200) %>%
+  select(dfs, alt) %>%
+  head()
+
+Env_local <- collect(Env_tbl_sel) # loading data into R
+Env_local
 
 DBI::dbDisconnect(con)
 con
@@ -290,7 +281,7 @@ doubsdata <- DBI::dbConnect(RPostgreSQL::PostgreSQL(), # connect
                           host = 'localhost',
                           port = 5432,
                           user = 'doubs',
-                          password = 'doubs')
+                          password = 'xxxx')
 
 doubsdata
 dbGetInfo(doubsdata)
