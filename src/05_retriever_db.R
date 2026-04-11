@@ -144,9 +144,9 @@ str(df_key)
 # 02- loading and saving data from local computer
 #####################################################
 data(doubs, package = 'ade4')
-
 Env <- doubs$env
 Spe <- doubs$fish
+
 write.csv(Env, "data/Env.csv", row.names = FALSE)
 write.csv(Spe, "data/Spe.csv", row.names = FALSE)
 Env_csv <- read.csv("data/Env.csv")
@@ -192,6 +192,8 @@ library(RSQLite)
 
 con <- dbConnect(RSQLite::SQLite(), 
                  "data/DOUBS.sqlite") # connecting or creating
+dbListTables(con) 
+DBI::dbDisconnect(con)
 
 # b. connecting to RStudio using rstdudio pane
 
@@ -213,7 +215,9 @@ con <- dbConnect(RSQLite::SQLite(),
 dbListTables(con) 
 dbWriteTable(con, "Env_sqlite", Env, overwrite = TRUE) # importing
 
-library(tidyverse) # working on data with dplyr in database
+Env_sqlite <- dbReadTable(con, "Env_sqlite") # for a small dataset
+
+library(tidyverse) # working with dplyr for big data
 Env_tbl <- tbl(con, "Env_sqlite")
 Env_tbl
 
@@ -274,51 +278,52 @@ con
 # create extension postgis with schema postgis;
 
 # C) connecting to a database of PostgreSQL via DBI
-
+library(DBI)
 library(RPostgreSQL)
-doubsdata <- DBI::dbConnect(RPostgreSQL::PostgreSQL(), # connect
+conn <- DBI::dbConnect(RPostgreSQL::PostgreSQL(), # connect
                           dbname = 'doubs',
                           host = 'localhost',
                           port = 5432,
                           user = 'doubs',
-                          password = 'xxxx')
+                          password = 'doubs')
 
-doubsdata
-dbGetInfo(doubsdata)
+conn
 
-# reading data and saving them into postgresql
-SPE <- read.csv("data/DoubsSpe.csv", row.names = 1)
-ENV <- read.csv("data/DoubsEnv.csv", row.names = 1)
-SPA <- read.csv("data/DoubsSpa.csv", row.names =1)
+# importing doubs data into postgresql
+data(doubs, package = 'ade4')
+Env <- doubs$env
+Spe <- doubs$fish
+Spa <- doubs$xy
 
 dbWriteTable(conn = doubsdata,
              name = "doubs_env", 
-             value = ENV,
+             value = Env,
              row.names = FALSE,
              overwrite = TRUE)
 
 dbWriteTable(conn = doubsdata,
              name = "doubs_spe",
-             value = SPE,
+             value = Spe,
              row.names = FALSE,
              overwrite = TRUE)
 
-dbWriteTable(conn = doubsdata,
+dbWriteTable(conn = conn,
              name = "doubs_spa",
-             value = SPA,
+             value = Spa,
              row.names = FALSE,
              overwrite = TRUE)
 
-dbListFields(doubsdata, "doubs_env") # List fields of the table
+dbListTables(conn) 
+dbListFields(conn, "doubs_Spa") # List fields of the table
 
-dbDisconnect(doubsdata)
-dbGetInfo(doubsdata)
+dbDisconnect(conn)
+dbGetInfo(conn)
 
 # Connect to PostgreSQL via Rstudio connection pane
 # https://www.youtube.com/watch?v=0euy9b3CjuY&t=551s
 
 # //open ubuntu terminal to edit /etc/odbc.ini like this
-# [doubsdata]
+# [doubs]
 # Driver = CData ODBC Driver for PostgreSQL
 # Description = My Description
 # User = doubs
@@ -329,5 +334,6 @@ dbGetInfo(doubsdata)
 
 # # saving doubs data into postgresql
 # ?dbWriteTable # from RPostgreSQL package
-# dbWriteTable(con, "doubs_env", ENV, overwrite = TRUE)
-# dbWriteTable(con, "doubs_spe", SPE, overwrite = TRUE)
+# dbWriteTable(con, "doubs_env", Env, overwrite = TRUE)
+# dbWriteTable(con, "doubs_spe", Spe, overwrite = TRUE)
+
