@@ -22,9 +22,8 @@ rm(list = ls()) # Remove all variables
 # A) visualizing river data and sampling points
 
 # import the .csv file of coordinate x, y
-
-doubs_xy <- read.csv("data/DoubsSpa.csv", 
-                     row.names = 1)
+data(doubs, package = "ade4")
+doubs_xy <- doubs$xy
 
 # write.csv(doubs_xy, "data/gisdata/pointcoord_utm.csv")
 
@@ -60,25 +59,26 @@ doubs_xy <- read.csv("data/DoubsSpa.csv",
 
 library(tidyverse)
 
-points_df <- read.csv("data/gisdata/pointcoord_geo.csv", 
+doubs_pts_df <- read.csv("data/gisdata/pointcoord_geo.csv", 
                       sep = ",")
-ggplot(data = points_df, aes(x = xcoord, y= ycoord)) + 
+
+ggplot(data = doubs_pts_df, aes(x = xcoord, y= ycoord)) + 
   geom_point()
 
 library(sf)
-points_sf <- read.csv("data/gisdata/pointcoord_geo.csv", 
+doubs_pts_sf <- read.csv("data/gisdata/pointcoord_geo.csv", 
                       sep = ",") %>%
   st_as_sf(coords=c("xcoord","ycoord"), crs=4326) 
 
-ggplot(data = points_sf) + 
-  geom_sf() +
+ggplot(data = doubs_pts_sf) + 
+  geom_sf() 
+# st_write(doubs_pts_sf, "data/gisdata/doubs_pts_sf.geojson")
 
-sample_sites <- read_sf("data/gisdata/sample_sites.shp")
-ggplot(data = sample_sites) + 
+doubs_pts <- read_sf("data/gisdata/sample_sites.shp")
+dim(doubs_pts)
+ggplot(data = doubs_pts) + 
   geom_sf() 
   
-# st_write(points_sf, "data/gisdata/points_sf.geojson")
-
 # B) getting DEM data covered by Le Doubs river
 
 ## load the shapefile of Ld Doubs rive 
@@ -86,42 +86,49 @@ ggplot(data = sample_sites) +
 doubs_river <- st_read("data/gisdata/doubs_river.shp") # 06_eda
 class(doubs_river)
 ggplot(data = doubs_river) +
-  geom_line()
-
-
+  geom_sf()
+ 
 # # install.packages("remotes")
 # remotes::install_github("rspatial/geodata")
 
 # library(elevatr)
 # doubs_elev <- get_elev_raster(doubs_river, z = 10) # z resolution
 # doubs_elev
-# terra::writeRaster(doubs_elev, "data/geo_data/doubs_dem.tif",
+# terra::writeRaster(doubs_elev, "data/gisdata/doubs_dem.tif",
 #                    filetype = "GTiff", overwrite = TRUE)
 
 # Visualizing river, locations and dem
+par(mfrow = c(1,1))
 
 library(terra)
 
-doubs_dem <- terra::rast("data/geo_data/doubs_dem.tif")
-terra::plot(doubs_dem, main="doubs river elevation")
+doubs_dem <- terra::rast("data/gisdata/doubs_dem.tif")
 
-doubs_river <- sf::st_read("data/geo_data/doubs_river1.shp")
-doubs_pts <- sf::st_read("data/geo_data/sample_points.shp")
-
+terra::plot(doubs_dem)
 plot(doubs_pts, add = TRUE, cex =1.8, col = "red")
 plot(doubs_river, add = TRUE, col = "yellow")
+
+dem_df <- as.data.frame(doubs_dem, xy = TRUE, na.rm = TRUE)
+colnames(dem_df)
+ggplot() +
+  geom_raster(data = dem_df, aes(x = x, y = y, fill = doubs_dem)) +
+  geom_sf(data = doubs_pts, aes(geometry = geometry), 
+          color = "red", size = 1) +
+  geom_sf(data = doubs_river, aes(geometry = geometry), 
+          color = "yellow", size = 0.5) +
+  theme_minimal()
 
 ########################################################
 # 02-extracting spatial features to add as predictors
 ########################################################
-## A) set a 5-km buffer along rive
+## A) setting a 5-km buffer along rive
 
 library(terra)
 library(sf)
 
-doubs_dem <- terra::rast("data/geo_data/doubs_dem.tif")
-doubs_river <- sf::st_read("data/geo_data/doubs_river.shp")
-doubs_pts <- sf::st_read("data/geo_data/sample_points.shp")
+doubs_dem <- terra::rast("data/gisdata/doubs_dem.tif")
+doubs_river <- sf::st_read("data/gisdata/doubs_river.shp")
+doubs_pts <- sf::st_read("data/gisdata/sample_sites.shp")
 
 # re-projecting the vector data of river
 doubs_river_utm <- st_transform(doubs_river, 
@@ -130,23 +137,25 @@ doubs_river_utm <- st_transform(doubs_river,
 # creating and visualizing the buffer
 
 doubs_river_buff <- st_buffer(doubs_river_utm, dis = 8000)
+class(doubs_river_buff)
 plot(st_geometry(doubs_river_buff), axes = TRUE)
 
 library(ggplot2)
 ggplot() + geom_sf(data = doubs_river_buff)
 
-# st_write(doubs_river_buff, 
-#          "data/geo_data/doubs_river_buff.shp")
+# st_write(doubs_river_buff,
+#          "data/gisdata/doubs_river_buff.geojson")
 
-# B) Clip or intersect dem covered by river buffer
-# reprojecting raster data
-doubs_dem <- terra::rast("data/geo_data/doubs_dem.tif")
+# B) Clipping or intersecting dem covered by river buffer
+# re_projecting raster data
+
 terra::crs(doubs_dem) # get CRS
 utm_crs <- "EPSG:32631" # set CRS
 doubs_dem_utm <- terra::project(doubs_dem,utm_crs)
-terra::crs(doubs_dem_utm) # check crs
+crs(doubs_dem_utm)# check crs
 
-# Clip or intersect dem by doubs river
+
+# Clipping or intersecting dem by doubs river
 
 doubs_dem_utm_cropped = terra::crop(doubs_dem_utm,
                              doubs_river_buff)
@@ -154,9 +163,9 @@ plot(doubs_dem_utm_cropped)
 doubs_dem_utm_masked = terra::mask(doubs_dem_utm_cropped,
                             doubs_river_buff)
 plot(doubs_dem_utm_masked)
-# writeRaster(doubs_dem_utm_masked, "data/geo_data/doubs_dem_crop.tif")
+# writeRaster(doubs_dem_utm_masked, "data/gisdata/doubs_dem_crop.tif")
 
-doubs_dem_crop <- terra::rast("data/geo_data/doubs_dem_crop.tif")
+doubs_dem_crop <- terra::rast("data/gisdata/doubs_dem_crop.tif")
 plot(doubs_dem_crop, axes = TRUE)
 
 # C) extracting raster values of points as predictors
@@ -187,38 +196,41 @@ origin(topo_select) <- # where grid begins
 
 topo_char = c(doubs_dem_crop, topo_select) # add dem to SpatRaster
 
-# writeRaster(topo_char, "data/geo_data/topo_char.tif", overwrite=FALSE)
+# writeRaster(topo_char, "data/gisdata/topo_char.tif", overwrite=FALSE)
 
 # reprojecting points to utm
 
 doubs_pts_utm <- sf::st_transform(doubs_pts, 32631)
 dim(doubs_pts_utm)
-# st_write(doubs_pts_utm,"data/geo_data/doubs_pts_utm.shp")
+# st_write(doubs_pts_utm,"data/gisdata/doubs_pts_utm.geojson")
 
 # extracting raster values
-topo_char <- terra::rast("data/geo_data/topo_char.tif")
-doubs_pts_utm <- st_read("data/geo_data/doubs_pts_utm.shp")
+topo_char <- terra::rast("data/gisdata/topo_char.tif")
+doubs_pts_utm <- st_read("data/gisdata/doubs_pts_utm.geojson")
   
-topo_points <- terra::extract(topo_char, doubs_pts_utm, ID=FALSE)
-glimpse(topo_points)
+doubs_pts_topo <- terra::extract(topo_char, doubs_pts_utm, ID=FALSE)
+glimpse(doubs_pts_topo)
 
 # aggregating topo and water chemical env
-env <- read.csv("data/data_db/DoubsEnv.csv", 
-                     row.names = 1)
 
-water_env <- env
-points_env = cbind(doubs_pts_utm, topo_env, water_env) # convert dataframe to SpatRaster
+doubs_pts_aquatic <- doubs$env
+doubs_pts_env = cbind(doubs_pts_utm, doubs_pts_topo, doubs_pts_aquatic) # convert dataframe to SpatRaster
 
-sf::st_write(points_env,  paste0("data/geo_data/points_env.shp"))
+# sf::st_write(doubs_pts_env, "data/gisdata/doubs_pts_env.geojson")
 
-Doubs <- load("data/geo_data/Doubs.RData")
-Doubs
-spe 
-spe_clean <- spe[!(rowSums(spe) == 0),]
-dim(spe_clean)
+spe <- doubs$fish
+spe$abund <- rowSums(spe) 
+spe_clean <- spe[spe$abund != 0, ]
+doubs_pts_env_clean <- 
+  doubs_pts_env[spe$abund != 0, ]
 
-# species abundance
-abund <- rowSums(spe_clean)
+env_spe <- doubs_pts_env_clean %>%
+  bind_cols(st_coordinates(doubs_pts_env_clean)) %>%
+  st_drop_geometry() %>%
+  select(X, Y, everything(),-id) %>%
+  mutate(abund = spe_clean$abund)
+
+# write.csv(env_spe, "data/env_spe.csv", row.names = FALSE)
 
 # # species diversity 
 # library(vegan)
@@ -231,15 +243,6 @@ abund <- rowSums(spe_clean)
 # E20 <- N2/N0 # Simpson evenness (Hill's ratio)
 # (div <- data.frame(N0, H, N1, N2, E10, E20, J))
 
-env_clean <- doubs_env[-8,]
-
-env_fish <- cbind(env_clean, abund) |>
-  dplyr::rename(fish_abund = abund)
-
-
-# sf::st_write(env_fish, paste0("data/geo_data", "/",
-#                                "env_fish.shp"),
-#              append=FALSE)
 
 # # ########################################################
 # # ## Methods for ESDA and ML of spatial polygons
