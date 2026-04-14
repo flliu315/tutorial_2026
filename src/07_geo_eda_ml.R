@@ -10,7 +10,7 @@
 
 # Author:     Fanglin Liu
 # Email:      flliu315@163.com
-# Date:       2025-03-09
+# Date:       2026-04-12
 # --------------------------------------------
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
@@ -19,71 +19,75 @@ rm(list = ls()) # Remove all variables
 
 # 01-access basic data of AOI (area of interest)
 
-# A) river data and sampling point coordinates
+# A) visualizing river data and sampling points
 
 # import the .csv file of coordinate x, y
 
-doubs_xy <- read.csv("data/data_db/DoubsSpa.csv", 
+doubs_xy <- read.csv("data/DoubsSpa.csv", 
                      row.names = 1)
 
-# write.csv(doubs_xy, "data/geo_data/pointcoord_utm.csv")
+# write.csv(doubs_xy, "data/gisdata/pointcoord_utm.csv")
 
 # getting the geocoordinates of sample points using qgis
 
 # // The 1st step  
 # creating coordinates_utm.csv to an image with qgis
 # Add Layer -> Add Delimited Text Layer -> 
-# Project -> Export -> Export as image (sample_points.png)
-
-# loading doubs_river.geojson created in 06_data_eda
-# as reference for georeferencing the sample_points.png
+# Project -> Export -> Export as image (sample_sites.png)
 
 # // The 2nd step 
-# a) using freehand geoferencer to georeference png
+# loading basic map and doubs_river.shp (epsg=4326)  
+# in 06_data_eda as reference for georeferencing the 
+# sample_sites.png
 # river map -> AD (adding png) -> geroreferencing
 # https://www.youtube.com/watch?v=fzz8jw7Qp18 
-# b) using the georeferencer  in layer
+# obtaining an exact image of the simple_sites
+
+# another way using the georeferencer  in layer
 # Layer -> # Georeferencer.. -> raster
-# https://www.youtube.com/watch?v=0CT3Un9v-6Q
+# https://www.youtube.com/watch?v=XV62QEk0Cxg&t=106s
 
 # // The 3rd step
-# installing and enabling coordinate capture plugin 
+# Layer -> Create Layer -> New Shapefile Layer for
+# georeferenced simple_sites
+# Toggle -> Add Point Feature -> save layer edits
+# for editing and saving on georeferenced sample_sites
 
-# Loading Georeferenced Image into QGIS
-# Layer > Add Layer > Add Raster Layer
-# click the gear ⚙️ to choose the CRS
-# Layer > Create Layer > New Shapefile Layer
-# Toggle -> Add Point Feature -> Save edits
-# Export > Save Features As... -> AS_XY
+# // The 4th step
+# processing -> textbox -> add geometry attributes
+# for extracting geo_coordinates x and y
+# https://www.youtube.com/watch?v=y8JKVciv26g
 
 library(tidyverse)
-pointcoord_geo <- read_csv("data/geo_data/DoubsSpa_geo.csv")
 
-# # Comparing the geo-referenced with the original
-# load("data/geo_data/Doubs.RData",  Doubs <- new.env())
-# ls.str(Doubs)
-# latlong <- Doubs$latlong
-# latlong
-
-# Doubs <- load("data/geo_data/Doubs.RData")
-# head(Doubs)
-
-# creating sf object
+points_df <- read.csv("data/gisdata/pointcoord_geo.csv", 
+                      sep = ",")
+ggplot(data = points_df, aes(x = xcoord, y= ycoord)) + 
+  geom_point()
 
 library(sf)
-points_sf <- read.csv("data/geo_data/pointcoord_geo.csv", 
-                      sep = ",") |> # set ";" if x.y is ";"
-  st_as_sf(coords=c("X","Y"), crs=4326) 
+points_sf <- read.csv("data/gisdata/pointcoord_geo.csv", 
+                      sep = ",") %>%
+  st_as_sf(coords=c("xcoord","ycoord"), crs=4326) 
 
-# st_write(points_sf, "data/geo_data/sample_points.shp")
+ggplot(data = points_sf) + 
+  geom_sf() +
 
-# B) getting other public data
-# get DEM data covered by Le Doubs river
+sample_sites <- read_sf("data/gisdata/sample_sites.shp")
+ggplot(data = sample_sites) + 
+  geom_sf() 
+  
+# st_write(points_sf, "data/gisdata/points_sf.geojson")
+
+# B) getting DEM data covered by Le Doubs river
 
 ## load the shapefile of Ld Doubs rive 
 
-doubs_river <- st_read("data/geo_data/doubs_river.shp") # 06_eda
-head(doubs_river)
+doubs_river <- st_read("data/gisdata/doubs_river.shp") # 06_eda
+class(doubs_river)
+ggplot(data = doubs_river) +
+  geom_line()
+
 
 # # install.packages("remotes")
 # remotes::install_github("rspatial/geodata")
