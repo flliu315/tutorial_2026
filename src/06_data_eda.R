@@ -35,7 +35,7 @@ rm(list = ls()) # Remove all variables
 # //saving the doubs OSM data to postgresql
 # https://www.youtube.com/watch?v=H9o0wme0nuk
 
-# B) using R codes
+# B) using R 
 # asking chatGPT for downloading river data from OSM
 
 "based on openstreetmap data, write R code to find Le Doubs
@@ -51,57 +51,22 @@ library(mapview) # interactively visualizing spatial data
 bbox <- c(left = 5.5, bottom = 46.5, right = 7.5, top = 48)
 
 # Query OSM for  "Le Doubs" waterways in a bounding box
-doubs_query <- opq(bbox = bbox) |>
-  add_osm_feature(key = "waterway", value = "river") |>
-  add_osm_feature(key = "name", value = "Le Doubs") |>
-  osmdata_sf() 
-doubs_query
+DOUBS_query <- opq(bbox = bbox) %>%
+  add_osm_feature(key = "waterway", value = "river") %>%
+  add_osm_feature(key = "name", value = "Le Doubs") 
+DOUBS_query
 
-# Visualizing Le Doubs (sf) on a map
-mapview(doubs_query$osm_lines)
-
-# Converting LINE to MULTILINES and binding to a sf object
-# https://ourcodingclub.github.io/tutorials/spatial-vector-sf/
-# 
-# ?bind_rows
-# ?st_cast
-library(sf)
-river_sf <- dplyr::bind_rows(
-  sf::st_cast(doubs_query$osm_lines, "MULTILINESTRING"), # from lines to MULTILINES
-  doubs_query$osm_multilines) |>
-  select(name, osm_id, role)
-
-class(river_sf)
-head(river_sf)
-
-# plot doubs_sf
-plot(river_sf)
-
-# unique(river_sf$role)
-
-# Filtering out unneeded shapes to make sure shapes are valid
-river_sf_clean <-
-  river_sf |>
-  filter(is.na(role) == FALSE) |> # remove role NAs
-  rename(doubs_type = role) |> # rename role to doubs_type
-  st_make_valid()
-
-unique(river_sf_clean$doubs_type)
-
-st_write(river_sf_clean, "data/gisdata/DOUBS_river.shp")
-DOUBS_river <- st_read("data/gisdata/DOUBS_river.shp")
-
-st_write(river_sf_clean, "data/gisdata/DOUBS_river.gpkg")
-DOUBS_river <- st_read("data/gisdata/DOUBS_river.gpkg")
-
+# set_overpass_url("https://lz4.overpass-api.de/api/interpreter") # select a url
+osm_data <- osmdata_sf(DOUBS_query) # getting the data
+DOUBS_river <- osm_data$osm_lines # extracting river geometry (lines)
+class(DOUBS_river) # Inspecting
+# mapview(DOUBS_river, color = "blue", lwd = 2) # Visualizating
 library(ggplot2)
-DOUBS_river <- ggplot(DOUBS_river) +
+ggplot(data = DOUBS_river) +
   geom_sf(color="blue")
-DOUBS_river
 
-ggsave("data/gisdata/DOUBS_river.png", 
-       plot = DOUBS_river,
-       width = 8, height = 6.5)
+st_write(DOUBS_river, "data/gisdata/DOUBS_river.gpkg")
+# st_write(DOUBS_river, "doubs.geojson")
 
 ##################################################
 # 02-loading fish-env data and pre-Processing them
@@ -115,8 +80,7 @@ con <- dbConnect(RPostgreSQL::PostgreSQL(),
                           dbname = 'doubs',
                           host = 'localhost',
                           port = 5432,
-                          user = 'doubs',
-                          password = 'xxxx')
+                          user = 'doubs')
 
 dbListTables(con)
 dbListFields(con, "doubs_env") # List fields of doubs_env table
@@ -143,6 +107,7 @@ names(doubs_spe) # Names of objects
 row_sums <- rowSums(doubs_spe)
 which(row_sums == 0)
 spe_clean <- doubs_spe[-8,] # remove the sites with no fish
+spe_clean
 
 # spe_clean <- doubs_spe %>%
 #   filter(rowSums(.) != 0)
@@ -176,42 +141,6 @@ sum(spe_clean == 0) / (nrow(spe_clean) * ncol(spe_clean))
 # spe_pa <- decostand(spe_clean, method = "pa")
 spe_hel <- decostand(spe_clean, method = "hellinger") 
 spe_log <- decostand(spe_clean,method = "log")
-
-# c. the amounts of rare or Dominant species 
-
-colSums(spe_clean > 0) # the number of sites by each species (abund)
-rowSums(spe_clean > 0) # species richness
-
-abund <- colSums(spe_clean)
-abund_sorted <- sort(abund, decreasing = TRUE)
-plot(abund_sorted,
-     type = "b",
-     log = "y",
-     main = "Rank-Abundance Curve",
-     xlab = "Species rank",
-     ylab = "Abundance (log scale)")
-
-# df2 <- data.frame(
-#   rank = 1:length(abund_sorted),
-#   abundance = abund_sorted
-# )
-# 
-# ggplot(df2, aes(x = rank, y = abundance)) +
-#   geom_line() +
-#   scale_y_log10() +
-#   theme_minimal() +
-#   labs(title = "Rank-Abundance Curve")
-
-apply(spe_clean, 2, max) # check the max value for each column
-
-# d. the double-zero problem
-# avoiding the dist() from the stats package
-library(vegan)
-fish_comm <- spe_clean[, colSums(spe_clean > 0) >= 3]
-dim(fish_comm)
-spe_hel <- decostand(fish_comm, method = "hellinger") # Hellinger
-dist_mat <- vegdist(spe_hel, method = "euclidean") # euclidean
-dist_mat <- vegdist(spe_hel, method = "bray") # Bray-Curtis
 
 # B) detecting and replacing outliers in the env columns
 
@@ -273,8 +202,8 @@ env_filled <- env_cleanNA %>%
 
 env_filled
 
-# 3) pre-exploration of the relationship begtween fishes and env
-# A) the distriution of sampling locations
+# 3) pre-explorating the relationship between fishes and env
+# A) the distribution of sampling locations
 
 plot(spa_clean, # using plot(…) function with lines(…), 
      # points(…), text(…), polygon(…) etc. 
@@ -429,7 +358,7 @@ plot(spe_db_ward)
 library(vegan)
 spe_dh <- vegdist(spe_hel, method="euclidean") 
 par(mfrow=c(1,1))
-spe_dh_single<-hclust(spe_dhel, method="single")
+spe_dh_single<-hclust(spe_dh, method="single")
 plot(spe_dh_single, main="Single linkage clustering", 
      hang =-1)
 
@@ -510,3 +439,4 @@ plot(env_spe_rda_pars, scaling = 1, display = c("sp", "lc", "cn"),
 plot(env_spe_rda_pars, 
      display = c("sp", "lc", "cn"), # sp(species), lc(location),cn(Constraints)
      main = "Scaling 2") # Scaling 2
+
