@@ -65,7 +65,7 @@ library(ggplot2)
 ggplot(data = DOUBS_river) +
   geom_sf(color="blue")
 
-st_write(DOUBS_river, "data/gisdata/DOUBS_river.gpkg")
+# st_write(DOUBS_river, "data/gisdata/DOUBS_river.gpkg")
 # st_write(DOUBS_river, "doubs.geojson")
 
 ##################################################
@@ -145,21 +145,21 @@ spe_log <- decostand(spe_clean,method = "log")
 # B) detecting and replacing outliers in the env columns
 
 # # detecting outlier for each variable
-# dfs <- env_clean$dfs
-# 
-# Q1 <- quantile(dfs, 0.25) 
-# Q3 <- quantile(dfs, 0.75) 
-# IQR <- Q3 - Q1
-# # Lower and Upper Bounds 
-# lower_bound <- Q1 - 1.5 * IQR
-# upper_bound <- Q3 + 1.5 * IQR 
-# outliers <- dfs[dfs < lower_bound | dfs > upper_bound] 
-# print(outliers)
-# 
-# par(mfrow= c(1, 2))
-# boxplot(dfs, ylab = "dfs")
-# boxplot(dfs, ylab = "dfs", horizontal = TRUE)
-# par(mfrow= c(1, 1))
+dfs <- env_clean$dfs
+Q1 <- quantile(dfs, 0.25)
+Q3 <- quantile(dfs, 0.75)
+IQR <- Q3 - Q1
+IQR
+# Lower and Upper Bounds
+lower_bound <- Q1 - 1.5 * IQR
+upper_bound <- Q3 + 1.5 * IQR
+outliers <- dfs[dfs < lower_bound | dfs > upper_bound]
+print(outliers)
+
+par(mfrow= c(1, 2))
+boxplot(dfs, ylab = "dfs")
+boxplot(dfs, ylab = "dfs", horizontal = TRUE)
+par(mfrow= c(1, 1))
 
 # a. detecting all columns of a dataframe and replacing with NA
 library(dplyr)
@@ -196,11 +196,11 @@ env_cleanNA
 
 # b. filled NA using mean for each column
 
-env_filled <- env_cleanNA %>%
+env_replaced <- env_cleanNA %>%
   mutate(across(where(is.numeric),
                 ~ ifelse(is.na(.), mean(., na.rm = TRUE), .)))
 
-env_filled
+env_replaced
 
 # 3) pre-explorating the relationship between fishes and env
 # A) the distribution of sampling locations
@@ -225,16 +225,16 @@ text(15, 120, "Downstream", cex = 1.2, col = "blue")
 par(mfrow=c(2,2)) # Plot four species
 xl <- "x coordinate (km)"
 yl <- "y coordinate (km)"
-plot(spa_clean, asp=1, col="brown", cex=spe_clean$LOC, 
+plot(spa_clean, asp=1, col="brown", cex=spe_clean$Neba, 
      main="Stone loach", xlab=xl, ylab=yl)
 lines(spa_clean, col="light blue", lwd=2)
-plot(spa_clean, asp=1, col="brown", cex=spe_clean$CHA, 
+plot(spa_clean, asp=1, col="brown", cex=spe_clean$Cogo, 
      main="European bullhead", xlab=xl, ylab=yl)
 lines(spa_clean, col="light blue", lwd=2)
-plot(spa_clean, asp=1, col="brown", cex=spe_clean$BAR, 
+plot(spa_clean, asp=1, col="brown", cex=spe_clean$Baba, 
      main="Barbel", xlab=xl, ylab=yl)
 lines(spa_clean, col="light blue", lwd=2)
-plot(spa_clean, asp=1, col="brown", cex=spe_clean$BCO, 
+plot(spa_clean, asp=1, col="brown", cex=spe_clean$Abbr, 
      main="Common bream", xlab=xl, ylab=yl)
 lines(spa_clean, col="light blue", lwd=2)
 par(mfrow=c(1,1))
@@ -243,21 +243,21 @@ par(mfrow=c(1,1))
 
 par(mfrow=c(1,4))
 plot(spa_clean, asp=1, main="Altitude", pch=21, col="white",
-     bg="red", cex=5*env_filled$alt/max(env_filled$alt), xlab="x", ylab="y")
+     bg="red", cex=5*env_replaced$alt/max(env_replaced$alt), xlab="x", ylab="y")
 lines(spa_clean, col="light blue", lwd=2)
 plot(spa_clean, asp=1, main="Discharge", pch=21, col="white",
-     bg="blue", cex=5*env_filled$flo/max(env_filled$flo), xlab="x", ylab="y")
+     bg="blue", cex=5*env_replaced$flo/max(env_replaced$flo), xlab="x", ylab="y")
 lines(spa_clean, col="light blue", lwd=2)
 plot(spa_clean, asp=1, main="Oxygen", pch=21, col="white",
-     bg="green3", cex=5*env_filled$oxy/max(env_filled$oxy), xlab="x", ylab="y")
+     bg="green3", cex=5*env_replaced$oxy/max(env_replaced$oxy), xlab="x", ylab="y")
 lines(spa_clean, col="light blue", lwd=2)
 plot(spa_clean, asp=1, main="Nitrate", pch=21, col="white",
-     bg="brown", cex=5*env_filled$nit/max(env_filled$nit), xlab="x", ylab="y")
+     bg="brown", cex=5*env_replaced$nit/max(env_replaced$nit), xlab="x", ylab="y")
 lines(spa_clean, col="light blue", lwd=2)
 par(mfrow=c(1,1))
 
 ############################################
-# 03- Q- and R-mode analysis on fish and env
+# 03 Q- and R-mode analysis on fish and env
 ###########################################
 # 1) for the env data
 
@@ -266,10 +266,10 @@ par(mfrow=c(1,1))
 
 # standardizing env variables (z-score) 
 library(vegan)
-env_z <- decostand(env_filled, "standardize")
-# apply(env_z, 2, mean) # means = 0
-# apply(env_z, 2, sd) # standard deviations = 1
-# env_z equal to env_scaled <- scale(env_filled)
+env_z <- decostand(env_replaced, "standardize")
+apply(env_z, 2, mean) # means = 0
+apply(env_z, 2, sd) # standard deviations = 1
+# # env_z equal to env_scaled <- scale(env_replaced)
 # apply(env_scaled, 2, mean) # means = 0
 # apply(env_scaled, 2, sd) # standard deviations = 1
 
@@ -283,41 +283,33 @@ PerformanceAnalytics::chart.Correlation(env_z,
 # B) Q-mode (dissimilarity among sites or rows)
 
 par(mfrow = c(1,1))
-env_d <- dist(env_z)
+env_d <- dist(env_z) # from built-in stats package
 env_d_single <- hclust(env_d, method = "single")
 plot(env_d_single) 
 
-# C) R- and Q-modes of PCA
+# C) R- and Q-modes' PCA
 
-pca_env1 <- prcomp(env_z)
+pca_env1 <- prcomp(env_z) # from built-in stats package
 summary(pca_env1) # variance explanation
 pca_env1$rotation # variable contribution
 pca_env1$x # sample scores
 biplot(pca_env1) # dot=pca$x; arrow=pca$ration
-biplot(pca_env1, scale = 1) 
-biplot(pca_env1, scale = 2)
+biplot(pca_env1, scale = 0) # for samples, similar to Q-mode
+biplot(pca_env1, scale = 1) # for variables, similar to R-mode
 
 # using rda() from vegan package
+pca_env2 <- vegan::rda(env_z) 
+biplot(pca_env2, scaling = 1) # for samples
+biplot(pca_env2, scaling = 2) # for variables
 
-vegan::decorana(env_clean) # model selection
-env_pca <- rda(env_clean, # run PCA, same to rda(env_z)
-               scale = TRUE) # calls a standardization
-
-summary(env_pca, scaling = 2) # By default scaling 2
-summary(env_pca, scaling = 1)
-
-# (env_ev <- env_pca$CA$eig) # Selecting PC
-# env_ev[env_ev > mean(env_ev)] 
-# env_n <- length(env_ev)
-# barplot(env_ev, main="Eigenvalues", col="grey", las=2)
-# abline(h=mean(env_ev), col="red") 
-# legend("topright", "Average eigenvalue", lwd=1, col=2, bty="n")
-
-plot(env_pca) # explainable variance of the axis
-biplot(env_pca, scaling =1, # Q-mode
-       main="scaling=1: object similarity") 
-biplot(env_pca, scaling =2, # R-mode
-       main="scaling=2: importance & corr") 
+# vegan::decorana(env_clean) # DCA1 >4 Unimodal, DCA1 <3 linear 
+# env_pca <- rda(env_clean, # run PCA, same to rda(env_z)
+#                scale = TRUE) # calls a standardization
+# 
+# biplot(env_pca, scaling =1, # Q-mode
+#        main="scaling=1: object similarity") 
+# biplot(env_pca, scaling =2, # R-mode
+#        main="scaling=2: variable correlation") 
 
 # 2) for the spe data
 # A) R-mode analysis
@@ -366,77 +358,70 @@ spe_dh_complete <- hclust(spe_dh, method = "complete")
 plot(spe_dh_complete, main="Complete linkage clustering", 
      hang=-1) 
 
-# C) R- and Q-modes of PCA
+# C) R- and Q-modes' PCA
 
-pca_spe1<- prcomp(spe_hel)
-summary(pca_spe1) 
-pca_spe1$rotation 
-pca_spe1$x 
-biplot(pca_spe1) 
+pca_spe_prcomp<- prcomp(spe_hel)
+summary(pca_spe_prcomp) 
+pca_spe_prcomp$rotation 
+pca_spe_prcomp$x 
+biplot(pca_spe_prcomp) 
 
 # using rda() from vegan package
 
+spe_pca_rda <- rda(spe_hel) # run pca with rda() 
+summary(spe_pca_rda, scaling = 2) 
+summary(spe_pca_rda, scaling = 1) 
+
+biplot(spe_pca_rda, scaling =1, main="PCA scaling=1") # Q-mode
+biplot(spe_pca_rda, scaling =2, main="PCA scaling=2") # R-mode
+
+# 3) RDA--the relationship between spe and env
 spe_hel <- decostand(spe_clean, "hellinger")
 vegan::decorana(spe_hel) # DCA1 >4 Unimodal, DCA1 <3 linear 
 
-spe_pca <- rda(spe_hel) # run pca with rda() 
-summary(spe_pca, scaling = 2) 
-summary(spe_pca, scaling = 1) 
+# A) doing RDA with manually removed vif > 10
+# initial RDA analysis
+env_spe_rda <- rda(spe_hel ~ ., data = env_z) 
+vif.cca(env_spe_rda) 
 
-# spe_ev <- spe_pca$CA$eig # # Selecting PC
-# spe_ev[spe_ev>mean(spe_ev)]
-# n <- length(spe_ev)
-# barplot(spe_ev, main="Eigenvalues", col="grey", las=2)
-# abline(h=mean(spe_ev), col="red") 
-# legend("topright", "Average eigenvalue", lwd=1, col=2, bty="n")
-
-biplot(spe_pca, scaling =1, main="PCA scaling=1") # Q-mode
-biplot(spe_pca, scaling =2, main="PCA scaling=2") # R-mode
-
-# 3) RDA--the relationship between spe and env
-
-spe_hel <- decostand(spe_clean, "hellinger")
-env_z <- decostand(env_filled, "standardize") #  centers and scales variables
-
-env_spe_rda <- rda(spe_hel ~ ., 
-                   data = env_z) # Scaling = 2 (by default)
-vif.cca(env_spe_rda) # multi-collinearity
-summary(env_spe_rda)
-
-anova(env_spe_rda, permutations = 1000) # Goodness of fit
-anova(env_spe_rda, by = "axis", permutations = 1000)
-anova(env_spe_rda, by = "term", permutations = 1000)
-
-plot(env_spe_rda, scaling=1, main="scaling 1")# Scaling 1
-plot(env_spe_rda, main="scaling 2")# Scaling 2
-
-# for futher optimizing RDA
+# for further optimizing RDA
 vif.cca(env_spe_rda) # deleting vif >10 variables
+env_z_selected <- env_z %>% # remove VIF > 10
+  select(-dfs, -alt)
+env_spe_rda_sel <- rda(spe_hel ~ ., 
+                       data = env_z_selected) 
+vif.cca(env_spe_rda_sel) 
 
+anova.cca(env_spe_rda_sel, permutations = 999) # Goodness of fit
+anova.cca(env_spe_rda_sel, by = "term", permutations = 999)
+
+plot(env_spe_rda_sel, scaling=1, main="scaling 1")# Scaling 1
+plot(env_spe_rda_sel, main="scaling 2")# Scaling 2
+
+# B) doing RDA with automatically selected by ordiR2step
+# which maximizes R2
 env_spe_rda_null <- rda(spe_hel ~ 1, data = env_z)
 env_spe_rda_all <- rda(spe_hel ~ ., data = env_z)
-(step_forward <- 
-    ordiR2step(env_spe_rda_null, 
+(env_spe_rda_pars <- # Parsimonious model
+    vegan::ordiR2step(env_spe_rda_null, 
                scope = formula(env_spe_rda_all), 
                direction = "forward",
-               pstep = 1000))
-RsquareAdj(step_forward)$adj.r.squared
+               pstep = 999))
+summary(env_spe_rda_pars)
 
-env_spe_rda_pars <- step_forward # Parsimonious model
-                          
-anova.cca(env_spe_rda_pars, permutations = 1000)
-anova(env_spe_rda_pars, permutations = 1000, by = "axis")
-anova(env_spe_rda_pars, permutations = 1000, by = "term")
+RsquareAdj(env_spe_rda_pars)$adj.r.squared
+RsquareAdj(env_spe_rda_sel)$adj.r.squared
 
-vif.cca(env_spe_rda_all) # VIF comparison
-vif.cca(env_spe_rda_pars)
+anova.cca(env_spe_rda_pars, permutations = 999)
+anova.cca(env_spe_rda_pars, permutations = 999, by = "term")
 
-par(mfrow = c(1, 2)) # plot final triplot
-
-plot(env_spe_rda_pars, scaling = 1, display = c("sp", "lc", "cn"), 
+par(mfrow = c(1, 2)) # plot triplot
+plot(env_spe_rda_pars, scaling = 1, 
+     # sp(species), lc(linear constraints),cn(constrained variables)
+     display = c("sp", "lc", "cn"), 
      main = "Scaling 1") # Scaling 1
 
 plot(env_spe_rda_pars, 
-     display = c("sp", "lc", "cn"), # sp(species), lc(location),cn(Constraints)
+     display = c("sp", "lc", "cn"), 
      main = "Scaling 2") # Scaling 2
-
+graphics.off()

@@ -16,6 +16,34 @@ cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
 
 ##################################################
+# 01- the vector and raster data
+
+## A) load the shapefile of Doubs rive 
+library(sf)
+doubs_river <- st_read("data/gisdata/doubs_river.shp") # 06_eda
+class(doubs_river)
+st_crs(doubs_river)
+st_crs(doubs_river)$proj4string
+st_crs(doubs_river)$epsg
+
+library(ggplot2)
+ggplot(data = doubs_river) +
+  geom_sf()
+
+# B) the digital elevation model (dem) of the doubs river
+# # install.packages("remotes")
+# remotes::install_github("rspatial/geodata")
+
+# library(elevatr)
+# doubs_elev <- get_elev_raster(doubs_river, z = 10) # z resolution
+# doubs_elev
+# terra::writeRaster(doubs_elev, "data/gisdata/doubs_dem.tif",
+#                    filetype = "GTiff", overwrite = TRUE)
+
+library(terra)
+doubs_dem <- terra::rast("data/gisdata/doubs_dem.tif")
+crs(doubs_dem)
+terra::crs(doubs_dem, proj=TRUE)
 
 # 01-access basic data of AOI (area of interest)
 
@@ -72,6 +100,7 @@ doubs_pts_sf <- read.csv("data/gisdata/pointcoord_geo.csv",
 
 ggplot(data = doubs_pts_sf) + 
   geom_sf() 
+
 # st_write(doubs_pts_sf, "data/gisdata/doubs_pts_sf.geojson")
 
 doubs_pts <- read_sf("data/gisdata/sample_sites.shp")
@@ -79,24 +108,6 @@ dim(doubs_pts)
 ggplot(data = doubs_pts) + 
   geom_sf() 
   
-# B) getting DEM data covered by Le Doubs river
-
-## load the shapefile of Ld Doubs rive 
-
-doubs_river <- st_read("data/gisdata/doubs_river.shp") # 06_eda
-class(doubs_river)
-ggplot(data = doubs_river) +
-  geom_sf()
- 
-# # install.packages("remotes")
-# remotes::install_github("rspatial/geodata")
-
-# library(elevatr)
-# doubs_elev <- get_elev_raster(doubs_river, z = 10) # z resolution
-# doubs_elev
-# terra::writeRaster(doubs_elev, "data/gisdata/doubs_dem.tif",
-#                    filetype = "GTiff", overwrite = TRUE)
-
 # Visualizing river, locations and dem
 par(mfrow = c(1,1))
 
@@ -225,12 +236,11 @@ doubs_pts_env_clean <-
   doubs_pts_env[spe$abund != 0, ]
 
 env_spe <- doubs_pts_env_clean %>%
-  bind_cols(st_coordinates(doubs_pts_env_clean)) %>%
-  st_drop_geometry() %>%
-  select(X, Y, everything(),-id) %>%
-  mutate(abund = spe_clean$abund)
+  mutate(abund = spe_clean$abund) %>%
+  relocate(abund, .before = geometry)
 
-# write.csv(env_spe, "data/env_spe.csv", row.names = FALSE)
+# st_write(env_spe, "data/gisdata/env_spe.gpkg") # gpkg = spatial sqite
+# st_write(env_spe, "data/gisdata/env_spe.geojson")
 
 # # species diversity 
 # library(vegan)
@@ -424,8 +434,6 @@ env_spe <- doubs_pts_env_clean %>%
 ########################################################
 # 03-ESDA of spatial dependence and heterogeneity for ML
 #######################################################
-cat("\014") # Clears the console
-rm(list = ls()) # Remove all variables
 
 # A) calculating the lagged mean and visualizing it
 # https://spatialanalysis.github.io/handsonspatialdata/global-spatial-autocorrelation-1.html
@@ -435,25 +443,29 @@ library(spdep)
 library(ggplot2)
 library(tidyverse)
 
-env_fish <- st_read("data/geo_data/env_fish.shp")
-plot(st_geometry(env_fish))
+env_spe <- st_read("data/gisdata/env_spe.gpkg")
+par(mfrow = c(1,1))
+ggplot(env_spe) +
+  geom_sf()
 
-env_fish_xy <- env_fish %>%
+env_spe_xy <- env_spe %>%
   mutate(
     x = sf::st_coordinates(.)[,1],
-    y = sf::st_coordinates(.)[,2]) 
+    y = sf::st_coordinates(.)[,2]
+    ) %>%
+  relocate(x, y, .after = id)
 
-# creating voronoi polygons and calculating nb and w
+# points -> voronoi polygons -> nb -> w
 
 library(deldir)
 library(sp)
-vtess <- deldir(env_fish_xy$x, 
-                env_fish_xy$y) # voronoi polygons
-class(vtess)
+vtess <- deldir(env_spe_xy$x, 
+                env_spe_xy$y) # voronoi polygons
+class(vtess) 
 plot(vtess, wlines = "tess", lty=1)
 
 voronoipolygons_sp = function(thiess) {# voronoi polygons to sp
-  w = tile.list(thiess)
+  w = tile.list(thiess) # extracting coordinates of polygons
   polys = vector(mode='list', length=length(w))
   for (i in seq(along=polys)) {
     pcrds = cbind(w[[i]]$x, w[[i]]$y)
@@ -494,69 +506,38 @@ queen_w <- spdep::nb2listw(queen_nb, style = "W") # from nb to weights
 queen_w$weights[1:3]
 summary(queen_w)
 
-# computing the lagged means of fish_abund 
+# computing the lagged means of abund 
 # https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
 
-env_fish_xy$lagged_means_fishabund <- 
-  lag.listw(queen_w, env_fish_xy$fish_abund)
+env_spe_xy <- env_spe_xy %>%
+  mutate(lagged_means_abund = lag.listw(queen_w, abund)) %>%
+  relocate(lagged_means_abund, .before = geom)
 
-p_lagged_mean = 
-  ggplot(data = env_fish_xy, 
-         aes(x = fish_abund, y = lagged_means_fishabund)) +
+lagged_mean_plot = 
+  ggplot(data = env_spe_xy, 
+         aes(x = abund, y = lagged_means_abund)) +
   geom_point(shape = 1, alpha = 0.5) +
-  geom_hline(yintercept = mean(env_fish_xy$lagged_means_fishabund), lty = 2) +
-  geom_vline(xintercept = mean(env_fish_xy$fish_abund), lty = 2) +
+  geom_hline(yintercept = mean(env_spe_xy$lagged_means_abund), lty = 2) +
+  geom_vline(xintercept = mean(env_spe_xy$abund), lty = 2) +
   geom_abline() +
   coord_equal()
-p_lagged_mean
-
-p_original = # the focused variable
-  ggplot(env_fish_xy) +
-  geom_sf(aes(fill = fish_abund), size = 2) +
-  scale_fill_viridis_c(option = "inferno", name = "original Value") +
-  theme_minimal()
-p_original 
-
-p_lagged <- ggplot(env_fish_xy) + 
-  geom_sf(aes(fill = lagged_means_fishabund), size = 2) +
-  scale_fill_viridis_c(option = "inferno", name = "Lagged Value") +
-  theme_minimal()
-p_lagged
-
-cowplot::plot_grid(p_original, p_lagged)
+lagged_mean_plot
 
 # B) Global Moran's I and test if statistically significant
 # http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html
 # https://rpubs.com/laubert/SACtutorial
 
-moran.plot(x = env_fish_xy$fish_abund, listw = queen_w, 
-           asp = 1) 
-title(main = "Global Moran's Scatter Plot")
+library(spdep)
+gI <- moran.test(x = env_spe_xy$abund, 
+                 listw = queen_w)
 
-# moran.plot(x = env_fish_xy$fish_abund, listw = queen_w,
-#            asp = 1,  xlab = "实际观察值", ylab = "空间滞后值")
-# library(svglite)
-# svglite("data/geo_data/moran.plot.svg")
-# dev.off
-
-
-
-# statistic test by zscore or range
-
-gI <- moran.test(x = env_fish_xy$fish_abund, listw = queen_w) # for Moran’s I for statistic test
-
-# for the dash lines
-gI$estimate
-gI
-#Calculate Z-score
 mI <- gI$estimate[[1]] # global moran's Index
 eI <- gI$estimate[[2]] # Expected moran's index
 var <- gI$estimate[[3]] # Variance of values
 zscore <- (mI-eI)/var**0.5 
-# -1.96 <zscore <1.96, no spatial correlation
-zscore 
+zscore # -1.96 <zscore <1.96, no spatial correlation
 
-# random if between min-max, else cluster or dispersed
+# if moran.range between min-max, else cluster or dispersed
 moran.range <- function(lw) {
   wmat <- listw2mat(lw)
   return(range(eigen((wmat + t(wmat))/ 2) $values))
@@ -565,65 +546,56 @@ moran.range <- function(lw) {
 moran.range(queen_w) 
 
 
+moran.plot(x = env_spe_xy$abund, listw = queen_w, 
+           asp = 1) 
+title(main = "Global Moran's Scatter Plot")
+
 # C) Local Spatial Autocorrelation and test
 # http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html#spatial-autocorrelation
 # https://www.kaggle.com/code/jankuper192/spatial-regression
 
-lI <- localmoran(env_fish_xy$fish_abund, 
-                       queen_w,
-                       zero.policy = TRUE, 
-                       na.action = na.omit)
-
-head(lI)
-
-# Extracting Moran’s I and appending to sf 
-
-env_fish_xy$lI <- lI[,1]
-env_fish_xy$ElI <- lI[,2]
-env_fish_xy$VarlI <- lI[,3]
-env_fish_xy$ZlI <- lI[,4] # standard deviate of lI
-env_fish_xy$PlI <- lI[,5]
+lI <- localmoran(env_spe_xy$abund, queen_w)
 
 # derive the cluster/outlier types 
 significanceLevel <- 0.05
-meanVal <- mean(env_fish_xy$fish_abund)
+meanVal <- mean(env_spe_xy$abund)
 
 library(magrittr)
-lisaRslt <- lI |>  
-  tibble::as_tibble() |>
-  magrittr::set_colnames(c("Ii","E.Ii","Var.Ii","Z.Ii","Pr()")) |>
+lisaRslt <- lI %>%  
+  tibble::as_tibble() %>% 
+  magrittr::set_colnames(c("Ii","E.Ii","Var.Ii","Z.Ii","Pr()")) %>% 
   dplyr::mutate(coType = dplyr::case_when(
     `Pr()` > 0.05 ~ "Insignificant",
-    `Pr()` <= 0.05 & Ii >= 0 & env_fish_xy$fish_abund >= meanVal ~ "HH",
-    `Pr()` <= 0.05 & Ii >= 0 & env_fish_xy$fish_abund < meanVal ~ "LL",
-    `Pr()` <= 0.05 & Ii < 0 & env_fish_xy$fish_abund >= meanVal ~ "HL",
-    `Pr()` <= 0.05 & Ii < 0 & env_fish_xy$fish_abund < meanVal ~ "LH"
+    `Pr()` <= 0.05 & Ii >= 0 & env_spe_xy$abund >= meanVal ~ "HH",
+    `Pr()` <= 0.05 & Ii >= 0 & env_spe_xy$abund < meanVal ~ "LL",
+    `Pr()` <= 0.05 & Ii < 0 & env_spe_xy$abund >= meanVal ~ "HL",
+    `Pr()` <= 0.05 & Ii < 0 & env_spe_xy$abund < meanVal ~ "LH"
   ))
 
 print(lisaRslt, n =29)
 
 # Now add this coType to the original sf
-env_fish_xy$coType <- lisaRslt$coType |> 
+env_spe_xy$coType <- lisaRslt$coType %>%  
   tidyr::replace_na("Insignificant")
 
 # Standardize the variable and its spatial lag
-env_fish_xy$z_var <- 
-  (env_fish_xy$fish_abund - mean(env_fish_xy$fish_abund)) / sd(env_fish_xy$fish_abund)
-env_fish_xy$z_lag <- 
-  (env_fish_xy$lagged_means_fishabund - mean(env_fish_xy$lagged_means_fishabund)) / sd(env_fish_xy$lagged_means_fishabund)
+env_spe_xy$z_abund <- 
+  (env_spe_xy$abund - mean(env_spe_xy$abund)) / sd(env_spe_xy$abund)
+env_spe_xy$z_laged_means_abund <- 
+  (env_spe_xy$lagged_means_abund - mean(env_spe_xy$lagged_means_abund)) / sd(env_spe_xy$lagged_means_abund)
 
-# Create a 'quadrant' variable to classify points based on z_var and z_lag
-env_fish_xy$quadrant <- with(env_fish_xy, 
+# Create a 'quadrant' variable to classify points
+env_spe_xy$quadrant <- with(env_spe_xy, 
                             case_when(
-                              z_var >= 0 & z_lag >= 0 ~ "High-High (HH)",
-                              z_var < 0 & z_lag >= 0 ~ "Low-High (LH)",
-                              z_var >= 0 & z_lag < 0 ~ "High-Low (HL)",
-                              z_var < 0 & z_lag < 0 ~ "Low-Low (LL)"
+                              z_abund>= 0 & z_laged_means_abund >= 0 ~ "High-High (HH)",
+                              z_abund < 0 & z_laged_means_abund >= 0 ~ "Low-High (LH)",
+                              z_abund >= 0 & z_laged_means_abund < 0 ~ "High-Low (HL)",
+                              z_abund < 0 & z_laged_means_abund < 0 ~ "Low-Low (LL)"
                             )
 )
 
-ggplot(env_fish_xy, 
-       aes(x = z_var, y = z_lag)) + # Create LISA plot
+ggplot(env_spe_xy, 
+       aes(x = z_abund, y = z_laged_means_abund)) + # Create LISA plot
   geom_hline(yintercept = 0, lty = 2) +
   geom_vline(xintercept = 0, lty = 2) +
   geom_point(aes(color = quadrant), shape = 16, alpha = 0.7, size = 2.5) +
@@ -644,11 +616,11 @@ ggplot(env_fish_xy,
   theme_minimal()
 
 
-ggplot(env_fish_xy) +
+ggplot(env_spe_xy) +
   geom_sf(aes(color = coType), size = 2) +  # use color, not fill
   scale_color_manual(values = c('red', 'lightgray', 'blue', 'yellow'), 
                      name = 'Clusters & \nOutliers') +
-  labs(title = "Shannon Diversity of Fishes") +
+  labs(title = "abundance of Fishes") +
   theme_minimal()
 
 ########################################################
