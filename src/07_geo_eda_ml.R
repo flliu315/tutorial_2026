@@ -17,7 +17,7 @@ rm(list = ls()) # Remove all variables
 
 ##################################################
 # 01- the vector and raster data
-
+#################################################
 ## A) load the shapefile of Doubs rive 
 library(sf)
 doubs_river <- st_read("data/gisdata/doubs_river.shp") # 06_eda
@@ -45,79 +45,55 @@ doubs_dem <- terra::rast("data/gisdata/doubs_dem.tif")
 crs(doubs_dem)
 terra::crs(doubs_dem, proj=TRUE)
 
-# 01-access basic data of AOI (area of interest)
+# C) getting the CRS of the sample points using qgis
 
-# A) visualizing river data and sampling points
-
-# import the .csv file of coordinate x, y
 data(doubs, package = "ade4")
 doubs_xy <- doubs$xy
-
 # write.csv(doubs_xy, "data/gisdata/pointcoord_utm.csv")
 
-# getting the geocoordinates of sample points using qgis
-
 # // The 1st step  
-# creating coordinates_utm.csv to an image with qgis
+
+# importing coordinates_utm.csv to make an image using qgis
 # Add Layer -> Add Delimited Text Layer -> 
-# Project -> Export -> Export as image (sample_sites.png)
+# Project -> Export -> Export as image (sample_points.png)
 
 # // The 2nd step 
-# loading basic map and doubs_river.shp (epsg=4326)  
-# in 06_data_eda as reference for georeferencing the 
-# sample_sites.png
-# river map -> AD (adding png) -> geroreferencing
-# https://www.youtube.com/watch?v=fzz8jw7Qp18 
-# obtaining an exact image of the simple_sites
+# loading basic OSM map and doubs_river.shp (epsg=4326)  
+# as reference for georeferencing the sample_points.png
 
-# another way using the georeferencer  in layer
-# Layer -> # Georeferencer.. -> raster
+# AD (sample_points.png) -> geroreferencing for an exact image
+# https://www.youtube.com/watch?v=fzz8jw7Qp18 
+# or Layer -> # Georeferencer.. -> raster for an exact image
 # https://www.youtube.com/watch?v=XV62QEk0Cxg&t=106s
 
 # // The 3rd step
-# Layer -> Create Layer -> New Shapefile Layer for
-# georeferenced simple_sites
-# Toggle -> Add Point Feature -> save layer edits
-# for editing and saving on georeferenced sample_sites
+# extracting the long and lat from the referenced image 
 
-# // The 4th step
+# Layer -> Create Layer -> New Shapefile Layer 
+# Toggle -> Add Point Feature (sampling) -> save layer edits
 # processing -> textbox -> add geometry attributes
-# for extracting geo_coordinates x and y
+# added geometry info -> Export -> save features as
+# -> comma seperated value [csv] 
 # https://www.youtube.com/watch?v=y8JKVciv26g
 
-library(tidyverse)
-
-doubs_pts_df <- read.csv("data/gisdata/pointcoord_geo.csv", 
-                      sep = ",")
-
-ggplot(data = doubs_pts_df, aes(x = xcoord, y= ycoord)) + 
-  geom_point()
-
-library(sf)
-doubs_pts_sf <- read.csv("data/gisdata/pointcoord_geo.csv", 
-                      sep = ",") %>%
-  st_as_sf(coords=c("xcoord","ycoord"), crs=4326) 
-
-ggplot(data = doubs_pts_sf) + 
-  geom_sf() 
-
-# st_write(doubs_pts_sf, "data/gisdata/doubs_pts_sf.geojson")
-
-doubs_pts <- read_sf("data/gisdata/sample_sites.shp")
-dim(doubs_pts)
-ggplot(data = doubs_pts) + 
-  geom_sf() 
-  
-# Visualizing river, locations and dem
+# D) visualizing river data and sampling points
 par(mfrow = c(1,1))
-
-library(terra)
+library(sf)
 
 doubs_dem <- terra::rast("data/gisdata/doubs_dem.tif")
+doubs_dem
+terra::plot(doubs_dem) # plot() from different packages
 
-terra::plot(doubs_dem)
+doubs_pts <- read_sf("data/gisdata/sample_points.shp")
+doubs_pts
+names(doubs_pts)
 plot(doubs_pts, add = TRUE, cex =1.8, col = "red")
-plot(doubs_river, add = TRUE, col = "yellow")
+
+doubs_river <- read_sf("data/gisdata/doubs_river.shp")
+doubs_river
+names(doubs_river)
+plot(st_geometry(doubs_river), # specifying the geometry column
+     add = TRUE, col = "yellow")
 
 dem_df <- as.data.frame(doubs_dem, xy = TRUE, na.rm = TRUE)
 colnames(dem_df)
@@ -130,7 +106,7 @@ ggplot() +
   theme_minimal()
 
 ########################################################
-# 02-extracting spatial features to add as predictors
+# 02-extracting spatial features as predictors
 ########################################################
 ## A) setting a 5-km buffer along rive
 
@@ -139,34 +115,30 @@ library(sf)
 
 doubs_dem <- terra::rast("data/gisdata/doubs_dem.tif")
 doubs_river <- sf::st_read("data/gisdata/doubs_river.shp")
-doubs_pts <- sf::st_read("data/gisdata/sample_sites.shp")
+doubs_pts <- sf::st_read("data/gisdata/sample_points.shp")
 
 # re-projecting the vector data of river
-doubs_river_utm <- st_transform(doubs_river, 
-                                32631) 
+doubs_river_utm <- st_transform(doubs_river, 32631) 
 
 # creating and visualizing the buffer
-
 doubs_river_buff <- st_buffer(doubs_river_utm, dis = 8000)
-class(doubs_river_buff)
+names(doubs_river_buff)
 plot(st_geometry(doubs_river_buff), axes = TRUE)
 
-library(ggplot2)
-ggplot() + geom_sf(data = doubs_river_buff)
-
+# ggplot(doubs_river_buff) +
+#   geom_sf(fill = "blue", color = "black")
 # st_write(doubs_river_buff,
 #          "data/gisdata/doubs_river_buff.geojson")
 
-# B) Clipping or intersecting dem covered by river buffer
+# B) Clipping or intersecting dem covered by the river buffer
 # re_projecting raster data
 
-terra::crs(doubs_dem) # get CRS
+terra::crs(doubs_dem, proj = TRUE) # get CRS
 utm_crs <- "EPSG:32631" # set CRS
-doubs_dem_utm <- terra::project(doubs_dem,utm_crs)
-crs(doubs_dem_utm)# check crs
+doubs_dem_utm <- terra::project(doubs_dem,utm_crs) # for sf using st_transform()
+crs(doubs_dem_utm, proj = TRUE)# check crs
 
-
-# Clipping or intersecting dem by doubs river
+# Clipping or intersecting dem by the doubs river
 
 doubs_dem_utm_cropped = terra::crop(doubs_dem_utm,
                              doubs_river_buff)
@@ -174,10 +146,7 @@ plot(doubs_dem_utm_cropped)
 doubs_dem_utm_masked = terra::mask(doubs_dem_utm_cropped,
                             doubs_river_buff)
 plot(doubs_dem_utm_masked)
-# writeRaster(doubs_dem_utm_masked, "data/gisdata/doubs_dem_crop.tif")
-
-doubs_dem_crop <- terra::rast("data/gisdata/doubs_dem_crop.tif")
-plot(doubs_dem_crop, axes = TRUE)
+# writeRaster(doubs_dem_utm_masked, "data/gisdata/doubs_dem_masked.tif")
 
 # C) extracting raster values of points as predictors
 # https://r.geocompx.org/eco
@@ -189,70 +158,62 @@ qgis_search_algorithms("wetness") |>
   head(2)
 
 # catchment slope and catchment area
-topo_total = qgisprocess::qgis_run_algorithm(
+topo = qgisprocess::qgis_run_algorithm(
   alg = "sagang:sagawetnessindex",
   DEM = doubs_dem_utm_masked,
   SLOPE_TYPE = 1, 
   SLOPE = tempfile(fileext = ".sdat"),
   AREA = tempfile(fileext = ".sdat"),
   .quiet = TRUE)
+str(topo)
 
-topo_select <- topo_total[c("AREA", "SLOPE")] |>
-  unlist() |>
-  rast() #  catchment area and slope
-topo_select
-names(topo_select) = c("carea", "cslope") # assign names
-origin(topo_select) <- # where grid begins
-  terra::origin(doubs_dem_crop) # the same origin
+topo_slo_area <- c(qgis_as_terra(topo$AREA), 
+                   qgis_as_terra(topo$SLOPE))
+names(topo_slo_area) <- c("carea", "cslope")
 
-topo_char = c(doubs_dem_crop, topo_select) # add dem to SpatRaster
+topo_dem_slo_area <- c(doubs_dem_utm_masked, topo_slo_area)
 
-# writeRaster(topo_char, "data/gisdata/topo_char.tif", overwrite=FALSE)
+writeRaster(topo_dem_slo_area,
+ "data/gisdata/topo_dem_slo_area.tif",
+ overwrite=FALSE)
 
-# reprojecting points to utm
+# re-projecting points to utm
 
-doubs_pts_utm <- sf::st_transform(doubs_pts, 32631)
-dim(doubs_pts_utm)
+doubs_pts_utm <- sf::st_transform(doubs_pts, utm_crs)
+
 # st_write(doubs_pts_utm,"data/gisdata/doubs_pts_utm.geojson")
 
 # extracting raster values
-topo_char <- terra::rast("data/gisdata/topo_char.tif")
+topo_dem_slo_area <- rast("data/gisdata/topo_dem_slo_area.tif")
 doubs_pts_utm <- st_read("data/gisdata/doubs_pts_utm.geojson")
   
-doubs_pts_topo <- terra::extract(topo_char, doubs_pts_utm, ID=FALSE)
+doubs_pts_topo <- terra::extract(topo_dem_slo_area, 
+                                 doubs_pts_utm, ID=FALSE)
 glimpse(doubs_pts_topo)
 
 # aggregating topo and water chemical env
 
-doubs_pts_aquatic <- doubs$env
-doubs_pts_env = cbind(doubs_pts_utm, doubs_pts_topo, doubs_pts_aquatic) # convert dataframe to SpatRaster
+doubs_pts_env = cbind(doubs_pts_utm, doubs_pts_topo, doubs$env) # convert dataframe to SpatRaster
 
-# sf::st_write(doubs_pts_env, "data/gisdata/doubs_pts_env.geojson")
+# st_write(doubs_pts_env, "data/gisdata/doubs_pts_env.geojson",
+# append=TRUE)
 
+# the final spe-env data with spatial attributes
 spe <- doubs$fish
 spe$abund <- rowSums(spe) 
 spe_clean <- spe[spe$abund != 0, ]
+
 doubs_pts_env_clean <- 
   doubs_pts_env[spe$abund != 0, ]
 
-env_spe <- doubs_pts_env_clean %>%
+env_spe_spa <- doubs_pts_env_clean %>%
   mutate(abund = spe_clean$abund) %>%
-  relocate(abund, .before = geometry)
+  relocate(abund, .before = geometry) %>%
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2]) %>%
+  relocate(x, y, .before = doubs_dem)
 
-# st_write(env_spe, "data/gisdata/env_spe.gpkg") # gpkg = spatial sqite
-# st_write(env_spe, "data/gisdata/env_spe.geojson")
-
-# # species diversity 
-# library(vegan)
-# N0 <- rowSums(spe_clean > 0) # Species richness
-# H <- vegan::diversity(spe_clean) # Shannon entropy
-# N1 <- exp(H) # Shannon diversity (number of abundant species)
-# N2 <- diversity(spe_clean, "inv") # Simpson diversity (number of dominant species)
-# J <- H/log(N0) # Pielou evenness
-# E10 <- N1/N0 # Shannon evenness (Hill's ratio)
-# E20 <- N2/N0 # Simpson evenness (Hill's ratio)
-# (div <- data.frame(N0, H, N1, N2, E10, E20, J))
-
+# st_write(env_spe_spa, "data/gisdata/env_spe_spa.gpkg") # gpkg = spatial sqite
 
 # # ########################################################
 # # ## Methods for ESDA and ML of spatial polygons
@@ -432,8 +393,12 @@ env_spe <- doubs_pts_env_clean %>%
 # bind_cols(nc, pr) |> names()
 
 ########################################################
-# 03-ESDA of spatial dependence and heterogeneity for ML
-#######################################################
+# 03- the Exploratory Spatial Data analysis (ESDA)
+########################################################
+# 1) the EDA analysis on the table-data part
+
+
+# the spatial dependence and heterogeneity
 
 # A) calculating the lagged mean and visualizing it
 # https://spatialanalysis.github.io/handsonspatialdata/global-spatial-autocorrelation-1.html
