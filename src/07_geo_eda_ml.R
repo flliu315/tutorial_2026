@@ -191,7 +191,7 @@ doubs_pts_topo <- terra::extract(topo_dem_slo_area,
                                  doubs_pts_utm, ID=FALSE)
 glimpse(doubs_pts_topo)
 
-# aggregating topo and water chemical env
+# aggregating topo and acquatic chemical env
 
 doubs_pts_env = cbind(doubs_pts_utm, doubs_pts_topo, doubs$env) # convert dataframe to SpatRaster
 
@@ -199,238 +199,121 @@ doubs_pts_env = cbind(doubs_pts_utm, doubs_pts_topo, doubs$env) # convert datafr
 # append=TRUE)
 
 # the final spe-env data with spatial attributes
-spe <- doubs$fish
-spe$abund <- rowSums(spe) 
-spe_clean <- spe[spe$abund != 0, ]
+fish <- doubs$fish
+fish$abund <- rowSums(fish) 
+fish_clean <- fish[fish$abund != 0, ]
 
 doubs_pts_env_clean <- 
-  doubs_pts_env[spe$abund != 0, ]
+  doubs_pts_env[fish$abund != 0, ]
 
-env_spe_spa <- doubs_pts_env_clean %>%
-  mutate(abund = spe_clean$abund) %>%
-  relocate(abund, .before = geometry) %>%
+env_fish_xy <- doubs_pts_env_clean %>%
+  mutate(fish_abund = fish_clean$abund) %>%
+  relocate(fish_abund, .before = geometry) %>%
   mutate(x = st_coordinates(.)[,1],
          y = st_coordinates(.)[,2]) %>%
   relocate(x, y, .before = doubs_dem)
 
-# st_write(env_spe_spa, "data/gisdata/env_spe_spa.gpkg") # gpkg = spatial sqite
-
-# # ########################################################
-# # ## Methods for ESDA and ML of spatial polygons
-# # #######################################################
-# # # https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
-# # 
-# # A) the global spatial autocorrelation
-# 
-# library(spData)
-# library(sf)
-# library(spdep)
-# library(ggplot2)
-# 
-# map <- st_read(system.file("shapes/columbus.shp",
-#                            package = "spData"), quiet = TRUE)
-# plot(st_geometry(map), border = "lightgray")
-# 
-# map$vble <- map$CRIME # the focusing variable
-# # mapview(map, zcol = "vble")
-# 
-# p_vble = # create the map
-#   ggplot(map) +
-#   geom_sf(aes(fill = map$vble)) +
-#   scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue") +
-#   theme_minimal()
-# 
-# p_vble
-# 
-# 
-# library(spdep)
-# nb <- poly2nb(map, queen = TRUE) # determine adjacency
-# 
-# library(tmap)
-# # examine zero links locations
-# map$rn = rownames(map)
-# tmap_mode("view")
-# tm_shape(map) +
-#   tm_borders() +
-#   tm_text(text = "rn") +
-#   tm_basemap("OpenStreetMap")
-# tmap_mode("plot")
-# 
-# # Create a line layer showing Queen's case contiguity
-# gg_net <- nb2lines(nb,coords=st_geometry(st_centroid(map)),
-#                    as_sf = F)
-# # Plot the contiguity and the map layer
-# p_adj =
-#   ggplot(map) + geom_sf(fill = NA, lwd = 0.1) +
-#   geom_sf(data = gg_net, col='red', alpha = 0.5, lwd = 0.2) +
-#   theme_minimal() + labs(subtitle =  "Adj")
-# p_adj
-# 
-# # spatial weights Matrix and the lagged means
-# 
-# nbw <- spdep::nb2listw(nb, style = "W") # compute weight matrix from nb
-# nbw$weights[1:3]
-# map$lagged_means <- lag.listw(nbw, map$vble) # compute lagged means
-# p_lagged =
-#   ggplot(map) + geom_sf(aes(fill = lagged_means)) +
-#   scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue") +
-#   theme_minimal()
-# 
-# cowplot::plot_grid(p_vble, p_lagged)
-# 
-# p_lm = # create a lagged mean plot
-#   ggplot(data = map, aes(x = vble, y = lagged_means)) +
-#   geom_point(shape = 1, alpha = 0.5) +
-#   geom_hline(yintercept = mean(map$lagged_means), lty = 2) +
-#   geom_vline(xintercept = mean(map$vble), lty = 2) +
-#   geom_abline() +
-#   coord_equal()
-# p_lm
-# 
-# # create a Moran plot and statistic test using weighted list
-# moran.plot(x = map$vble, listw = nbw, asp = 1)
-# 
-# moran.test(x = map$vble, listw = nbw) # for Moran’s I for statistic test
-# 
-# moran.range <- function(lw) {
-#   wmat <- listw2mat(lw)
-#   return(range(eigen((wmat + t(wmat))/ 2) $values))
-# }
-# 
-# moran.range(nbw) # strongly clustered
-# 
-# # B) local spatial autocorrelation and clusters
-# 
-# # Compute the local Moran’s I
-# map$lI <- localmoran(x = map$vble, listw = nbw)[, 1]
-# 
-# p_lisa = # create the map
-#   ggplot(map) +
-#   geom_sf(aes(fill= lI), lwd = 0.1) +
-#   scale_fill_gradient2(midpoint = 0, name = "Local\nMoran's I",
-#                        high = "darkgreen", low = "white") +
-#   theme_minimal()
-# p_lisa # print the map
-# 
-# # Create the local p values
-# map$pval <- localmoran(map$vble,nbw)[, 5]
-# map$pval
-# 
-# p_lisa_pval =
-#   ggplot(map) +
-#   geom_sf(aes(fill= pval), lwd = 0.1) +
-#   scale_fill_gradient2(midpoint = 0.05,
-#                        name = "p-values",
-#                        high = "red", low = "white") +
-#   theme_minimal()
-# 
-# p_lisa_pval # print the map
-# 
-# cowplot::plot_grid(p_lisa + theme(legend.position = "bottom"),
-#           p_lisa_pval + theme(legend.position = "bottom"),
-#           ncol = 2)
-# 
-# index  = map$pval <= 0.05
-# p_vble + geom_sf(data = map[index,], fill = NA,
-#                  col = "black", lwd = 0.5)
-# 
-# # Getis-Ord G statistic
-# 
-# map$gstat <- as.numeric(localG(map$vble, nbw))
-# 
-# p_geto =
-#   ggplot(map) +
-#   geom_sf(aes(fill = gstat)) +
-#   scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue",
-#                        name = "G Statistic")+
-#   theme_minimal()
-# p_geto
-# 
-# # C) Incorporating spatial AC and heterogeneity into ML
-# 
-# # a) Simple Linear Regression
-# 
-# formula <- "vble ~ AREA + PERIMETER + HOVAL + INC + OPEN + X + Y"
-# # compute model
-# model1 <- lm(formula = formula, data = map)
-# # view model statistics
-# summary(model1)
-# 
-# # b) Spatial Regress Models accounting for spatial AC
-# 
-# model2 <- spatialreg::lagsarlm( # lag model
-#   formula = formula,
-#   data = map,
-#   listw = nbw
-# )
-# 
-# model3 <- spatialreg::errorsarlm( # error model
-#   formula = formula,
-#   data = map,
-#   listw = nbw
-# )
-# 
-# jtools::export_summs(model1, model2, model3) # compare to linear model
-# 
-# spdep::moran.test(model2$residuals, nbw) # model2 and models Moran's I test
-# spdep::moran.test(model3$residuals, nbw)
-# 
-# # c) Geographically Weighted Regress accounting for heterogeneity
-# # load packages
-# library(SpatialML)
-# library(GWmodel)
-# map_sp <- map %>% # convert to sp object
-#   as_Spatial()
-# 
-# library(tidyverse)
-# library(sf)
-# system.file("gpkg/nc.gpkg", package="sf") |>
-#   read_sf() -> nc
-# 
-# nc1 <- nc |> mutate(SID = SID74/BIR74, NWB = NWBIR74/BIR74)
-# lm(SID ~ NWB, nc1) |>
-#   predict(nc1, interval = "prediction") -> pr
-# bind_cols(nc, pr) |> names()
+# st_write(env_fish_xy, "data/gisdata/env_fish_xy.gpkg") # gpkg = spatial sqite
 
 ########################################################
 # 03- the Exploratory Spatial Data analysis (ESDA)
 ########################################################
-# 1) the EDA analysis on the table-data part
+# The key step of building a machine learning model is to
+# do EDA analysis for detecting the correlation among the 
+# predictors, as well as them with response. Here the step
+# will be skipped.
 
+# # 1) the EDA analysis on the table-data part
+# 
+# library(sf)
+# library(ggplot2)
+# library(tidyverse)
+# 
+# env_fish_xy <- st_read("data/gisdata/env_fish_xy.gpkg")
+# ggplot(env_fish_xy) +
+#   geom_sf()
+# 
+# # A) checking the target
+#  
+# summary(env_fish_xy$abund)
+# 
+# hist(env_fish_xy$abund, breaks = 10, main = "Abund distribution")
+# plot(density(env_fish_xy$abund), main = "Density of abund")
+# boxplot(env_fish_xy$abund, main = "Boxplot of abund")
+# shapiro.test(env_fish_xy$abund)
+# 
+# env_fish_xy_logabund <- env_fish_xy %>%
+#   mutate(logabund = log1p(abund)) %>%
+#   select(-abund)
+# 
+# # B) checking the predictors
+# 
+# library(dplyr)
+# env_fish_xy_df <- sf::st_drop_geometry(env_fish_xy)
+# vars <- env_fish_xy_df[, -c(1:3, 18)]
+# boxplot(vars)
+# 
+# replace_outliers <- function(x) {
+#   if (!is.numeric(x)) return(x)
+#   
+#   Q1 <- quantile(x, 0.25, na.rm = TRUE)
+#   Q3 <- quantile(x, 0.75, na.rm = TRUE)
+#   IQR <- Q3 - Q1
+#   lower <- Q1 - 1.5 * IQR
+#   upper <- Q3 + 1.5 * IQR
+#   x[x < lower | x > upper] <- NA
+#   return(x)
+# }
+# 
+# vars_outliers_NA <- vars %>%
+#   mutate(across(everything(), replace_outliers))
+# vars_outliers_NA
+# 
+# vars_inliers <- vars_outliers_NA %>%
+#   mutate(across(where(is.numeric),
+#                 ~ ifelse(is.na(.), mean(., na.rm = TRUE), .)))
+# vars_inliers 
+# 
+# library(car)
+# 
+# model <- lm(env_fish_xy_df$abund ~ ., data = vars_inliers)
+# car::vif(model)
+# 
+# library(usdm)
+# v <- vifstep(vars_inliers)
+# v
+# env_fish_xy_modified <- env_fish_xy %>%
+#   select(-c(dfs, alt))
+# 
+# # st_write(env_fish_xy_modified,
+# #          "data/gisdata/env_fish_xy_modified.gpkg",
+# #          append=FALSE)
 
-# the spatial dependence and heterogeneity
+# 2) the spatial dependence and heterogeneity
 
 # A) calculating the lagged mean and visualizing it
 # https://spatialanalysis.github.io/handsonspatialdata/global-spatial-autocorrelation-1.html
+# points -> voronoi polygons -> nb -> w
 
 library(sf)
 library(spdep)
 library(ggplot2)
 library(tidyverse)
 
-env_spe <- st_read("data/gisdata/env_spe.gpkg")
-par(mfrow = c(1,1))
-ggplot(env_spe) +
-  geom_sf()
+env_fish_xy <- st_read("data/gisdata/env_fish_xy.gpkg")
+plot(st_geometry(env_fish_xy))
 
-env_spe_xy <- env_spe %>%
-  mutate(
-    x = sf::st_coordinates(.)[,1],
-    y = sf::st_coordinates(.)[,2]
-    ) %>%
-  relocate(x, y, .after = id)
-
-# points -> voronoi polygons -> nb -> w
+# creating voronoi polygons and calculating nb and w
 
 library(deldir)
 library(sp)
-vtess <- deldir(env_spe_xy$x, 
-                env_spe_xy$y) # voronoi polygons
-class(vtess) 
+vtess <- deldir(env_fish_xy$x, 
+                env_fish_xy$y) # voronoi polygons
+class(vtess)
 plot(vtess, wlines = "tess", lty=1)
 
 voronoipolygons_sp = function(thiess) {# voronoi polygons to sp
-  w = tile.list(thiess) # extracting coordinates of polygons
+  w = tile.list(thiess)
   polys = vector(mode='list', length=length(w))
   for (i in seq(along=polys)) {
     pcrds = cbind(w[[i]]$x, w[[i]]$y)
@@ -471,38 +354,47 @@ queen_w <- spdep::nb2listw(queen_nb, style = "W") # from nb to weights
 queen_w$weights[1:3]
 summary(queen_w)
 
-# computing the lagged means of abund 
+# computing the lagged means of fish_abund 
 # https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
 
-env_spe_xy <- env_spe_xy %>%
-  mutate(lagged_means_abund = lag.listw(queen_w, abund)) %>%
-  relocate(lagged_means_abund, .before = geom)
+env_fish_xy$lagged_means_fishabund <- 
+  lag.listw(queen_w, env_fish_xy$fish_abund)
 
-lagged_mean_plot = 
-  ggplot(data = env_spe_xy, 
-         aes(x = abund, y = lagged_means_abund)) +
+p_lagged_mean = 
+  ggplot(data = env_fish_xy, 
+         aes(x = fish_abund, y = lagged_means_fishabund)) +
   geom_point(shape = 1, alpha = 0.5) +
-  geom_hline(yintercept = mean(env_spe_xy$lagged_means_abund), lty = 2) +
-  geom_vline(xintercept = mean(env_spe_xy$abund), lty = 2) +
+  geom_hline(yintercept = mean(env_fish_xy$lagged_means_fishabund), lty = 2) +
+  geom_vline(xintercept = mean(env_fish_xy$fish_abund), lty = 2) +
   geom_abline() +
   coord_equal()
-lagged_mean_plot
+p_lagged_mean
 
 # B) Global Moran's I and test if statistically significant
 # http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html
 # https://rpubs.com/laubert/SACtutorial
 
-library(spdep)
-gI <- moran.test(x = env_spe_xy$abund, 
-                 listw = queen_w)
+moran.plot(x = env_fish_xy$fish_abund, listw = queen_w, 
+           asp = 1) 
+title(main = "Global Moran's Scatter Plot")
 
+# statistic test by zscore or range
+
+gI <- moran.test(x = env_fish_xy$fish_abund, 
+                 listw = queen_w) # for Moran’s I for statistic test
+gI
+# for the dash lines
+gI$estimate
+
+#Calculate Z-score
 mI <- gI$estimate[[1]] # global moran's Index
 eI <- gI$estimate[[2]] # Expected moran's index
 var <- gI$estimate[[3]] # Variance of values
 zscore <- (mI-eI)/var**0.5 
-zscore # -1.96 <zscore <1.96, no spatial correlation
+# -1.96 <zscore <1.96, no spatial correlation
+zscore 
 
-# if moran.range between min-max, else cluster or dispersed
+# random if between min-max, else cluster or dispersed
 moran.range <- function(lw) {
   wmat <- listw2mat(lw)
   return(range(eigen((wmat + t(wmat))/ 2) $values))
@@ -510,57 +402,65 @@ moran.range <- function(lw) {
 
 moran.range(queen_w) 
 
-
-moran.plot(x = env_spe_xy$abund, listw = queen_w, 
-           asp = 1) 
-title(main = "Global Moran's Scatter Plot")
-
 # C) Local Spatial Autocorrelation and test
 # http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html#spatial-autocorrelation
 # https://www.kaggle.com/code/jankuper192/spatial-regression
 
-lI <- localmoran(env_spe_xy$abund, queen_w)
+lI <- localmoran(env_fish_xy$fish_abund, 
+                 queen_w,
+                 zero.policy = TRUE, 
+                 na.action = na.omit)
+
+head(lI)
+
+# Extracting Moran’s I and appending to sf 
+
+env_fish_xy$lI <- lI[,1]
+env_fish_xy$ElI <- lI[,2]
+env_fish_xy$VarlI <- lI[,3]
+env_fish_xy$ZlI <- lI[,4] # standard deviate of lI
+env_fish_xy$PlI <- lI[,5]
 
 # derive the cluster/outlier types 
 significanceLevel <- 0.05
-meanVal <- mean(env_spe_xy$abund)
+meanVal <- mean(env_fish_xy$fish_abund)
 
 library(magrittr)
-lisaRslt <- lI %>%  
-  tibble::as_tibble() %>% 
-  magrittr::set_colnames(c("Ii","E.Ii","Var.Ii","Z.Ii","Pr()")) %>% 
+lisaRslt <- lI |>  
+  tibble::as_tibble() |>
+  magrittr::set_colnames(c("Ii","E.Ii","Var.Ii","Z.Ii","Pr()")) |>
   dplyr::mutate(coType = dplyr::case_when(
     `Pr()` > 0.05 ~ "Insignificant",
-    `Pr()` <= 0.05 & Ii >= 0 & env_spe_xy$abund >= meanVal ~ "HH",
-    `Pr()` <= 0.05 & Ii >= 0 & env_spe_xy$abund < meanVal ~ "LL",
-    `Pr()` <= 0.05 & Ii < 0 & env_spe_xy$abund >= meanVal ~ "HL",
-    `Pr()` <= 0.05 & Ii < 0 & env_spe_xy$abund < meanVal ~ "LH"
+    `Pr()` <= 0.05 & Ii >= 0 & env_fish_xy$fish_abund >= meanVal ~ "HH",
+    `Pr()` <= 0.05 & Ii >= 0 & env_fish_xy$fish_abund < meanVal ~ "LL",
+    `Pr()` <= 0.05 & Ii < 0 & env_fish_xy$fish_abund >= meanVal ~ "HL",
+    `Pr()` <= 0.05 & Ii < 0 & env_fish_xy$fish_abund < meanVal ~ "LH"
   ))
 
 print(lisaRslt, n =29)
 
 # Now add this coType to the original sf
-env_spe_xy$coType <- lisaRslt$coType %>%  
+env_fish_xy$coType <- lisaRslt$coType |> 
   tidyr::replace_na("Insignificant")
 
 # Standardize the variable and its spatial lag
-env_spe_xy$z_abund <- 
-  (env_spe_xy$abund - mean(env_spe_xy$abund)) / sd(env_spe_xy$abund)
-env_spe_xy$z_laged_means_abund <- 
-  (env_spe_xy$lagged_means_abund - mean(env_spe_xy$lagged_means_abund)) / sd(env_spe_xy$lagged_means_abund)
+env_fish_xy$z_var <- 
+  (env_fish_xy$fish_abund - mean(env_fish_xy$fish_abund)) / sd(env_fish_xy$fish_abund)
+env_fish_xy$z_lag <- 
+  (env_fish_xy$lagged_means_fishabund - mean(env_fish_xy$lagged_means_fishabund)) / sd(env_fish_xy$lagged_means_fishabund)
 
-# Create a 'quadrant' variable to classify points
-env_spe_xy$quadrant <- with(env_spe_xy, 
-                            case_when(
-                              z_abund>= 0 & z_laged_means_abund >= 0 ~ "High-High (HH)",
-                              z_abund < 0 & z_laged_means_abund >= 0 ~ "Low-High (LH)",
-                              z_abund >= 0 & z_laged_means_abund < 0 ~ "High-Low (HL)",
-                              z_abund < 0 & z_laged_means_abund < 0 ~ "Low-Low (LL)"
-                            )
+# Create a 'quadrant' variable to classify points based on z_var and z_lag
+env_fish_xy$quadrant <- with(env_fish_xy, 
+                             case_when(
+                               z_var >= 0 & z_lag >= 0 ~ "High-High (HH)",
+                               z_var < 0 & z_lag >= 0 ~ "Low-High (LH)",
+                               z_var >= 0 & z_lag < 0 ~ "High-Low (HL)",
+                               z_var < 0 & z_lag < 0 ~ "Low-Low (LL)"
+                             )
 )
 
-ggplot(env_spe_xy, 
-       aes(x = z_abund, y = z_laged_means_abund)) + # Create LISA plot
+ggplot(env_fish_xy, 
+       aes(x = z_var, y = z_lag)) + # Create LISA plot
   geom_hline(yintercept = 0, lty = 2) +
   geom_vline(xintercept = 0, lty = 2) +
   geom_point(aes(color = quadrant), shape = 16, alpha = 0.7, size = 2.5) +
@@ -581,15 +481,15 @@ ggplot(env_spe_xy,
   theme_minimal()
 
 
-ggplot(env_spe_xy) +
+ggplot(env_fish_xy) +
   geom_sf(aes(color = coType), size = 2) +  # use color, not fill
   scale_color_manual(values = c('red', 'lightgray', 'blue', 'yellow'), 
                      name = 'Clusters & \nOutliers') +
-  labs(title = "abundance of Fishes") +
+  labs(title = "Abundance of Fishes") +
   theme_minimal()
 
 ########################################################
-# 04-spatial autocorrelation and heterogeneity into ML
+# 04-building ML model with spatial autocorrelation 
 #######################################################
 # A) Simple Linear Regression with X and Y coordinates
 # https://rpubs.com/zulfiqar_stat/1131164
@@ -599,262 +499,208 @@ library(sf)
 library(sp)
 library(tidyverse)
 
-spe_env_spa <- st_read("data/geo_data/spe_env_spa.shp")
+env_fish_xy <- st_read("data/gisdata/env_fish_xy.gpkg")
 
-ggplot(data = spe_env_spa) +
+ggplot(data = env_fish_xy) +
   geom_sf() +  # Plot the spatial data
   theme_minimal()  # Use a minimal theme
               
-env_fish_xy <- spe_env_spa %>%
-  mutate(
-    x = sf::st_coordinates(.)[,1],
-    y = sf::st_coordinates(.)[,2]
-    ) 
+env_fish_xy_df <- env_fish_xy %>%
+  st_drop_geometry() %>%
+  subset(select = -id)
 
-env_fish_df <- env_fish_xy |>
-  st_drop_geometry() |> # remove geometry
-  na.omit() |> # omit NA
-  subset(select = -points) |>
-  relocate(c("x","y"))
+str(env_fish_xy_df)
 
-str(env_fish_df)
+# removing correlated env factors from env_fish_xy_df
 
-# removing correlated factors from doubs env
-# env_factors <- env_fish_df |>
-#   dplyr::select(-fish_abund)
-# PerformanceAnalytics::chart.Correlation(env_factors, 
-#                                         histogram = TRUE,  
-#                                         pch = 19)
-
-cor_matrix <- env_fish_df |>
-  subset(select = -spe_abund) |>
-  cor(use = "complete.obs", method = "pearson")
-
-threshold <- 0.8
+cor_matrix <- env_fish_xy_df %>%
+  subset(select = -fish_abund) %>%
+  cor(use = "complete.obs", 
+      method = "pearson")
+threshold <- 0.9
 highly_correlated_vars <- 
   caret::findCorrelation(cor_matrix, 
                          cutoff = threshold, 
                          verbose = TRUE)
 
-model_vars <- env_fish_df[, -highly_correlated_vars]
+model_vars <- env_fish_xy_df[, -highly_correlated_vars]
 str(model_vars)
 
-library(spatialreg)
-formula = spe_abund ~.
-model_lm <- lm(formula = formula, data = model_vars)
-summary(model_lm) # degree of freedom: m =independent, n-m-1
+library(randomForest)
+model_rf1 <- randomForest(fish_abund ~., data = model_vars)
+print(model_rf1) 
 
-# B) spatial random forest with only buffer distances
+# B) spatial random forest with the buffer distances
 
-# a) making a prediction grid (SpatialPixelsDataFrame)
+# a) creating a prediction grid (sf)
 
-env_fish_sp <- env_fish_df
-coordinates(env_fish_sp) <- ~ x + y # df -> sp
-class(env_fish_sp)
-proj4string(env_fish_sp) <- CRS("+proj=utm +zone=31 +datum=WGS84 +units=m +no_defs")
-plot(env_fish_sp)
+env_fish_xy <- st_read("data/gisdata/env_fish_xy.gpkg")
+names(env_fish_xy)
 
-res <- 1000 # Set resolution
-# Round bounding box to resolution
-x_min <- bbox(env_fish_sp)[1,1] %/% res * res
-x_max <- (bbox(env_fish_sp)[1,2] + res) %/% res * res
-y_min <- bbox(env_fish_sp)[2,1] %/% res * res
-y_max <- (bbox(env_fish_sp)[2,2] + res) %/% res * res
-str(env_fish_sp@data)
+par(mfrow = c(1,1))
+res <- 1000  # 1000 m × 1000 m
+grid <- st_make_grid(
+  env_fish_xy,  
+  cellsize = res,
+  what = "centers"
+)
+class(grid)
 
-# Creating the grid coordinates
-grid_df <- expand.grid(x = seq(x_min, x_max, by = res),
-                       y = seq(y_min, y_max, by = res))
-str(grid_df)
+grid_sf <- st_sf(geometry = grid) # equal to data.frame + geometry
 
-# converting the grid into a SpatialPixelsDataFrame
-
-grid_sp <- grid_df
-grid_sp$dummy <- 1 # Assigning dummy data for SpatialPixelsDataFrame
-coordinates(grid_sp) <- ~ x + y # Converting to the SpatialPoints
-gridded(grid_sp) <- TRUE # creating SpatialPixelsDataFrame
-class(grid_sp)
+plot(grid_sf)
+plot(grid_sf)
 
 # b) clipping the grid region of doubs river
-# Convert SpatialPixelsDataFrame to sf Object
+doubs_river <- st_read("data/gisdata/doubs_river.shp")
+doubs_river_utm <- st_transform(doubs_river, 
+                                st_crs(env_fish_xy))
+doubs_river_buff <- st_buffer(doubs_river_utm, 
+                              dist = 8000)
+plot(st_geometry(doubs_river_buff))
+clipped_grid <- st_filter(grid_sf, doubs_river_buff)
+plot(st_geometry(clipped_grid))
 
-grid_sf <- st_as_sf(grid_sp)
-sf::st_crs(grid_sf) <- 32631
+# c) each sample points distance to each quantile
 
-river <- sf::st_read("data/geo_data/doubs_river.shp")
-river_utm <- st_transform(river, 32631) 
-river_buff <- st_buffer(river_utm, dis = 8000)
-plot(st_geometry(river_buff), axes = TRUE)
+# fish_abund divided to 16 quantiles
+env_fish_xy_df <- env_fish_xy %>%
+  st_drop_geometry() 
 
-# clipping the grid limited to the river buffer area
-clipped_grid <- st_intersection(grid_sf, river_buff)
-plot(st_geometry(clipped_grid), axes = TRUE)
-class(clipped_grid)
-glimpse(clipped_grid)
+q_abund <- quantile(env_fish_xy_df$fish_abund, 
+                    seq(0, 1, by = 0.0625), na.rm = TRUE)
 
-# st_write(clipped_grid, 
-#          "data/geo_data/clipped_grid.shp",
-#          append=FALSE)
+classes_q_abund <- cut(env_fish_xy_df$fish_abund,
+                       breaks = q_abund,
+                       include.lowest = TRUE,
+                       ordered_result = TRUE)
 
-# back to the SpatialPixelsDataFrame format
+env_fish_xy_df$q_class <- as.character(classes_q_abund)
+env_fish_xy_df
 
-clipped_grid <- st_read("data/geo_data/clipped_grid.shp")
+# calculating the min distance of a grid to each quantile
+points_sf <- st_as_sf(env_fish_xy_df, # convert to sf 
+                      coords = c("x", "y"),
+                      crs = st_crs(clipped_grid))
 
-clipped_grid_sp <- as(clipped_grid, "Spatial")
-gridded(clipped_grid_sp) <- TRUE
-class(clipped_grid_sp) # Check result
+grid_dist_list <- list()
+for (cls in unique(points_sf$q_class)) {
+  pts_sub <- points_sf[points_sf$q_class == cls, ]
+  dmat <- st_distance(clipped_grid, pts_sub)
+  dmat <- as.matrix(dmat)
+  min_dist <- apply(dmat, 1, min)
+  grid_dist_list[[cls]] <- min_dist
+}
 
-plot(clipped_grid_sp, pch = 20, cex = 0.5, # verify
-     main = "Prediction Grid")
+grid_dist_df <- as.data.frame(grid_dist_list)
+colnames(grid_dist_df) <- paste0("dist_Q", 
+                                 seq_len(ncol(grid_dist_df)))
+clipped_grid <- cbind(clipped_grid, grid_dist_df)
+str(grid_dist_df)
+head(grid_dist_df)
 
-# saveRDS(clipped_grid_sp, "data/geo_data/clipped_grid_sp.rds")
+# exacting the buffer distance for each sample point
 
-# c) Target quantiles  and distances to each quantile
+idx <- st_nearest_feature(points_sf, clipped_grid)
+buffer_dists <- clipped_grid[idx, ] %>% 
+  st_drop_geometry()
 
-(q_abund <- quantile(env_fish_df$spe_abund, 
-                     seq(0,1,by=0.0625)))
-classes_q_abund <- cut(env_fish_df$spe_abund, 
-                                breaks=q_abund, 
-                                ordered_result=TRUE, 
-                                include.lowest=TRUE)
-levels(classes_q_abund)
-
-
-grid_dist <- landmap::buffer.dist(env_fish_sp["spe_abund"],
-                                  clipped_grid_sp, 
-                                  classes_q_abund)
-head(grid_dist)
-dim(grid_dist)
-
-# save(grid_dist, # Save as R data object
-#      file = "data/geo_data/grid_dist.RData")
-
-# saveRDS(grid_dist, # Save as RDS file
-#         file = "data/geo_data/grid_dist.rds")
-
-load("data/geo_data/grid_dist.RData")
-summary(grid_dist)
-
-plot(raster::stack(grid_dist))
-
-# exacting distance to each point
-buffer_dists <- over(env_fish_sp, grid_dist)
 dim(buffer_dists)
-dim(env_fish_sp)
-buffer_dists[1,]
+head(buffer_dists)
 
-env_fish_dist <- cbind(env_fish_sp@data, buffer_dists)
-str(env_fish_dist)
+env_fish_dist <- cbind(
+  st_drop_geometry(points_sf),
+  buffer_dists
+)
 
-# write.csv(env_fish_dist, "data/geo_data/env_fish_dist.csv")
+head(env_fish_dist)
 
-# d) buffer distances-based Spatial random forest 
+# write.csv(env_fish_dist, "data/gisdata/env_fish_dist.csv")
 
-env_fish_dist <- read.csv("data/geo_data/env_fish_dist.csv", row.names = 1)
-str(env_fish_dist)
+# d. buffer distances-based Spatial random forest 
 
 set.seed(123)
-dn <- paste(names(grid_dist), collapse="+")
-# str(grid_dist@data)
-(fm <- as.formula(paste("spe_abund ~", dn)))
+dn <- paste(names(grid_dist_df), collapse="+")
+(fm <- as.formula(paste("fish_abund ~", dn)))
+(model_rf2 <- randomForest(fm, # rf for predicting obs
+                          env_fish_dist, 
+                          importance=TRUE, 
+                          min.split=5, 
+                          mtry=5, 
+                          ntree=800))
+print(model_rf2)
+pred_rf <- predict(model_rf2, newdata=env_fish_dist) 
 
-library(randomForest)
-set.seed(123)
-(model_rf <- randomForest(fm, # rf for predicting obs
-                    env_fish_dist, 
-                    importance=TRUE, 
-                    min.split=5, 
-                    mtry=5, 
-                    ntree=800))
+varImpPlot(model_rf2, type=1)
 
-pred_rf <- predict(model_rf, newdata=env_fish_dist) 
-plot(model_rf)
-varImpPlot(model_rf, type=1)
-plot(env_fish_sp$spe_abund ~ pred_rf, 
+plot(env_fish_dist$fish_abund ~ pred_rf, 
      asp=1, 
      pch=20, 
      xlab="Random forest fit", 
      ylab="Actual value", 
      main="fish abundance")
 abline(0,1); grid(nx=30,ny=30)
-(rmse_rf <- 
-    sqrt(sum((pred_rf-env_fish_dist$fish_abund )^2)/length(pred_rf)))
+rmse_rf <- sqrt(mean((pred_rf - env_fish_dist$fish_abund)^2))
+rmse_rf
+r2_rf <- cor(pred_rf, env_fish_dist$fish_abund)^2
+r2_rf
 
-# e) mapping the prediction on the distance grid 
+# e. mapping the prediction on the distance grid 
 
-pred_grid <- predict(model_rf, 
-                     newdata=grid_dist@data)
-str(grid_dist@data)
+pred_grid <- predict(model_rf2, 
+                     newdata=grid_dist_df)
 
+clipped_grid$model_rf2 <- pred_grid
+str(clipped_grid)
 
-clipped_grid_sp$model_rf <- pred_grid
-str(clipped_grid_sp@data)
-breaks <- seq(2, 90, by=.5)
-p1 <- spplot(clipped_grid_sp, # SpatialPixelsDataFrame of grid
-            zcol="model_rf", 
-             main="fish abund", 
-             sub="RRF 16 distance buffers", 
-             at=breaks)
-print(p1)
+library(ggplot2)
+ggplot(clipped_grid) +
+  geom_sf(aes(color = model_rf2)) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(
+    title = "Predicted Fish Abundance",
+    subtitle = "Random Forest with Distance-to-Quantile Features",
+    color = "Abundance"
+  )
 
-# D) Spatial random forest on buffer distances and cocovariates
+# f. spatial random forest on buffer distances and co_vars 
+dn_vec <- names(grid_dist_df)
+covars_vec <- setdiff(names(doubs_env),
+                      c("fish_abund", "x", "y", "id"))
+all_vars <- c(dn_vec, covars_vec)
 
-# extracting raster values
-topo_char <- terra::rast("data/geo_data/topo_char.tif")
+fm_covars <- as.formula(
+  paste("fish_abund ~", paste(all_vars, collapse = "+"))
+)
 
-grid_topo <- terra::extract(topo_char, clipped_grid, 
-                                    ID=FALSE)
-str(grid_topo)
-grid_topo_dist <- cbind(grid_topo, grid_dist)
-str(grid_topo_dist)
+fm_covars
 
-grid_topo_sp <- grid_topo_dist
-coordinates(grid_topo_sp) <- ~ x + y # Converting to the SpatialPoints
-gridded(grid_topo_sp) <- TRUE # creating SpatialPixelsDataFrame
+set.seed(123)
+model_rf3 <- randomForest(
+  fm_covars,
+  data = env_fish_dist,
+  importance = TRUE,
+  ntree = 1000
+)
 
-# spatial random forest on buffer distances and co_vars 
-
-(covars <- paste(intersect(names(env_fish_sp@data), 
-                           names(grid_topo_sp)), 
-                 collapse="+"))
-
-(fm_covars <- as.formula(paste("spe_abund ~", 
-                               dn, 
-                               "+", 
-                               covars)))
-
-(model_rf_covars <- randomForest(fm_covars, 
-                                 env_fish_dist,
-                                 importance=TRUE, 
-                                 min.split=5, 
-                                 mtry=5, 
-                                 ntree=1000))
-
-pred_rf_covars <- predict(model_rf_covars, 
-                          newdata=env_fish_dist) 
-plot(model_rf_covars)
-varImpPlot(model_rf_covars, type=1)
-plot(env_fish_dist$spe_abund ~ pred_rf_covars, 
-     asp=1, 
-     pch=20, 
-     xlab="Random forest fit with covars", 
-     ylab="Actual value", 
-     main="fish abundance")
-abline(0,1); grid(nx=30,ny=30)
-(rmse_rf_covars <- 
-    sqrt(sum((pred_rf_covars-env_fish_dist$fish_abund )^2)/length(pred_rf_covars)))
+print(model_rf3)
 
 # mapping the prediction on the distance grid 
+pred_rf3 <- predict(model_rf3, newdata = env_fish_dist)
+plot(env_fish_dist$fish_abund ~ pred_rf3,
+     asp = 1,
+     pch = 20,
+     col = "steelblue",
+     xlab = "Predicted (RF + covars)",
+     ylab = "Observed",
+     main = "Fish abundance")
 
-pred_grid_covars <- predict(model_rf_covars, 
-                     newdata=grid_topo_sp@data)
+abline(0, 1, col = "red", lwd = 2)
+grid()
 
-grid_topo_sp$model_rf_covars <- pred_grid_covars
-str(grid_topo_sp@data)
-breaks <- seq(2, 90, by=.5)
-p2 <- spplot(grid_topo_sp, # SpatialPixelsDataFrame of grid
-            zcol="model_rf_covars", 
-            main="fish abund", 
-            sub="RRF 16 distance buffers", 
-            at=breaks)
-print(p2)
+rmse_rf3 <- sqrt(mean((pred_rf3 - env_fish_dist$fish_abund)^2))
+rmse_rf3
+
+r2_rf3 <- cor(pred_rf3, env_fish_dist$fish_abund)^2
+r2_rf3

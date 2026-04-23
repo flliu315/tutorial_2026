@@ -376,13 +376,13 @@ biplot(spe_pca_rda, scaling =1, main="PCA scaling=1") # Q-mode
 biplot(spe_pca_rda, scaling =2, main="PCA scaling=2") # R-mode
 
 # 3) RDA--the relationship between spe and env
+library(vegan)
 spe_hel <- decostand(spe_clean, "hellinger")
 vegan::decorana(spe_hel) # DCA1 >4 Unimodal, DCA1 <3 linear 
 
 # A) doing RDA with manually removed vif > 10
 # initial RDA analysis
 env_spe_rda <- rda(spe_hel ~ ., data = env_z) 
-vif.cca(env_spe_rda) 
 
 # for further optimizing RDA
 vif.cca(env_spe_rda) # deleting vif >10 variables
