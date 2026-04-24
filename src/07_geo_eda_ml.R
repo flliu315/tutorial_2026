@@ -301,6 +301,8 @@ library(ggplot2)
 library(tidyverse)
 
 env_fish_xy <- st_read("data/gisdata/env_fish_xy.gpkg")
+env_fish_xy
+
 plot(st_geometry(env_fish_xy))
 
 # creating voronoi polygons and calculating nb and w
