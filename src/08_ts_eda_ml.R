@@ -425,11 +425,6 @@ recipe_spec <- recipe(value ~ ., train_data) |>
 
 summary(prep(recipe_spec))
 
-rec <- recipe(value ~., data = train_data) |>
-  step_lag(index, DATE, lag = 2:3) |>
-  prep(df) |>
-  bake(df)
-
 # C) training and evaluating models
 # a. Training a boosted tree model
 xgb_model <- boost_tree(mode = "regression") |>
