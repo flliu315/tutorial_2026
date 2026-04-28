@@ -382,16 +382,23 @@ ggplot(rf_pred, aes(x = DATE)) +
 # A) splitting the training/test datasets
 
 n_rows <- nrow(CHE_tk_biom)
+train_rows <- round(0.8 * n_rows)
 
-splits <- time_series_split(
-  CHE_tk_biom,
-  date_var   = DATE,
-  assess     = n_rows - round(0.8 * n_rows),
-  cumulative = TRUE
-)
+train_data <- CHE_tk_biom |>
+  slice(1:train_rows)
 
-train_data <- training(splits)
-test_data <- testing(splits) 
+test_data <- CHE_tk_biom |>
+  slice(train_rows:n_rows)   
+
+# splits <- time_series_split(
+#   CHE_tk_biom,
+#   date_var   = DATE,
+#   assess     = n_rows - round(0.8 * n_rows),
+#   cumulative = TRUE
+# )
+# 
+# train_data <- training(splits)
+# test_data <- testing(splits) 
 
 ggplot() +
   geom_line(data = train_data, 
