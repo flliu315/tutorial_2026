@@ -551,7 +551,7 @@ class(grid)
 grid_sf <- st_sf(geometry = grid) # equal to data.frame + geometry
 
 plot(grid_sf)
-plot(grid_sf)
+
 
 # b) clipping the grid region of doubs river
 doubs_river <- st_read("data/gisdata/doubs_river.shp")
@@ -563,7 +563,7 @@ plot(st_geometry(doubs_river_buff))
 clipped_grid <- st_filter(grid_sf, doubs_river_buff)
 plot(st_geometry(clipped_grid))
 
-# c) each sample points distance to each quantile
+# c) each grid distance to each quantile
 
 # fish_abund divided to 16 quantiles
 env_fish_xy_df <- env_fish_xy %>%
