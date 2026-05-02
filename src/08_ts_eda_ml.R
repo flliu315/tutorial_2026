@@ -17,7 +17,7 @@ rm(list = ls()) # Remove all variables
 # A) use ts() to create a time series
 
 data=read.table('data/tsdata/DOUBS_fishBiomassData.txt',h=TRUE)
-head(data)
+data
 data_clean <- data |>
   dplyr::select(-YEAR) |>
   distinct() # Identify and Remove Duplicate Data
@@ -30,7 +30,8 @@ CHE_VOL_data <- data_clean |>
   subset(STATION=="VOLPla" & SP == "CHE")
 
 CHE_ts = ts(data = CHE_VOL_data[, -c(1:5)], # creating ts
-             start = c(1994), # Start Year 1994
+             start = 1994, # Start Year 1994
+             end = 2020,
              frequency = 1)  # freq = 1
 
 # Plot data with faceting
@@ -189,7 +190,8 @@ CHE_tk_biom |>
     .smooth = FALSE,
     .title = "BIOMASS Time Series"
   )
-CHE_tk_biom_ts <- ts(CHE_tk_biom$value, start=1994, frequency=1)
+CHE_tk_biom_ts <- ts(CHE_tk_biom$value, start=1994, 
+                     frequency=1)
 
 # 2) splitting training/test and pre-processing
 ts_train <- window(CHE_tk_biom_ts, end = 2018)
@@ -222,6 +224,7 @@ last_obs <- as.vector(tail(ts_train, 1))
 backtrans_fc <- last_obs * exp_term 
 y_pred <- ts(backtrans_fc, start = 2019, frequency = 1)
 forecast::accuracy(as.numeric(y_pred), as.numeric(y_test))
+
 library(fpp2)
 ts_fc <- cbind(CHE_tk_biom_ts,pred = c(rep(NA, length(ts_train)), y_pred)) 
 plot_fc <- ts_fc |> autoplot() + theme_minimal() 
