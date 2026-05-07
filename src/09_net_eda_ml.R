@@ -393,15 +393,15 @@ get_edge_features <- function(i, j, g) {
   return(c(cn, jaccard, pa, aa))
 }
 
-edge_features <- do.call(rbind, lapply(1:nrow(all_edges_df), function(i) {
-  e <- all_edges_df[i, 1:2]
+edge_features <- do.call(rbind, lapply(1:nrow(all_edges_labels), function(i) {
+  e <- all_edges_labels[i, 1:2]
   get_edge_features(e[1], e[2], g)
 }))
 
 colnames(edge_features) <- c("CN", "Jaccard", "PA", "AA")
 
 # Standardizing edge features
-edge_features <- scale(edge_features)
+# edge_features_scaled <- scale(edge_features)
 # saveRDS(edge_features, "data/netdata/edge_features.rds")
 
 # C) splitting training and validation sets
@@ -475,7 +475,7 @@ history <- model |> fit(
   x_train,
   y_train,
   validation_data = list(x_val, y_val),
-  epochs = 50,
+  epochs = 10,
   batch_size = 32
   )
 
