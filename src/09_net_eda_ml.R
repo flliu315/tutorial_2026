@@ -210,7 +210,7 @@ plot(otu_warming_g_optimal, main ="co-occurrence network",
      vertex.size=5,  # Size of the node (default is 15)
      edge.lty =1,
      edge.curved =TRUE)
-
+tkplot(otu_warming_g_optimal)
 # write_graph(otu_warming_g_optimal,
 #             "data/netdata/otu_warming_net.txt", "edgelist")
 
@@ -328,7 +328,9 @@ cc_local
 # A) the positive/negative edges
 
 # Load otu_warming_net data
-g <- read_graph("data/netdata/otu_warming_net.txt", format = "edgelist")
+library(igraph)
+g <- read_graph("data/netdata/otu_warming_net.txt", 
+                format = "edgelist")
 g <- as_undirected(g, mode = "collapse")
 tkplot(g)  # Visualize the graph
 node_ids <- V(g)  # Get the node IDs
@@ -336,15 +338,16 @@ print(node_ids)
 
 # total possible edges
 possible_edges_mat <- t(combn(V(g), 2))
-possible_edges_chars <- apply(possible_edges_mat, 1, function(x) paste(sort(x), collapse = "-"))
-length(possible_edges_chars)
+possible_edges_links <- apply(possible_edges_mat, 1, function(x) paste(sort(x), collapse = "-"))
+length(possible_edges_links)
 
 # positive or existing edges
 positive_edgelist_mat <- as_edgelist(g)  # Getting the edge list
-positive_edges_chars <- apply(positive_edgelist_mat, 1, function(x) paste(sort(x), collapse = "-"))
-length(positive_edges_chars)
+positive_edges_links <- apply(positive_edgelist_mat, 1, function(x) paste(sort(x), collapse = "-"))
+length(positive_edges_links)
 
-positive_edges_df <- positive_edges_chars %>%
+library(dplyr)
+positive_edges_labels <- positive_edges_links %>%
   strsplit("-") %>%  # Splitting char
   do.call(rbind, .) %>%  # Merging into a matrix
   as.data.frame(stringsAsFactors = FALSE) %>%  # Converting to dataframe
@@ -352,11 +355,11 @@ positive_edges_df <- positive_edges_chars %>%
   mutate(label = 1)  # Adding labels for positive edges
 
 # the negative or non-existing edges
-existing_edges <- apply(positive_edgelist_mat, 1, function(x) paste(sort(x), collapse = "-"))
-negative_edges_chars <- setdiff(possible_edges_chars, existing_edges)
-length(negative_edges_chars)
+existing_edges_links <- apply(positive_edgelist_mat, 1, function(x) paste(sort(x), collapse = "-"))
+negative_edges_links <- setdiff(possible_edges_links, existing_edges_links)
+length(negative_edges_links)
 
-negative_edges_df <- negative_edges_chars %>%
+negative_edges_labels <- negative_edges_links %>%
   strsplit("-") %>%  # Splitting char
   do.call(rbind, .) %>%  # Merging into a matrix
   as.data.frame(stringsAsFactors = FALSE) %>%  # Converting to dataframe
@@ -364,8 +367,10 @@ negative_edges_df <- negative_edges_chars %>%
   mutate(label = 0)  # Adding labels for negative edges
 
 # combining and shuffling all edges
-all_edges_df <- bind_rows(positive_edges_df, negative_edges_df) %>%
+all_edges_labels <- bind_rows(positive_edges_labels, negative_edges_labels) %>%
   sample_frac(1)  # Shuffling edges
+
+# saveRDS(all_edges_labels, "data/netdata/all_edge_label.rds")
 
 # B) constructing features
 
@@ -400,14 +405,16 @@ edge_features <- scale(edge_features)
 # saveRDS(edge_features, "data/netdata/edge_features.rds")
 
 # C) splitting training and validation sets
+edge_features <- readRDS("data/netdata/edge_features.rds")
+all_edges_labels <- readRDS("data/netdata/all_edge_label.rds")
 
 set.seed(123)
 idx <- sample(1:nrow(edge_features), size = 0.8 * nrow(edge_features))
 x_train <- edge_features[idx, ]
-y_train <- all_edges_df$label[idx]
+y_train <- all_edges_labels$label[idx]
 
 x_val <- edge_features[-idx, ]
-y_val <- all_edges_df$label[-idx]
+y_val <- all_edges_labels$label[-idx]
 
 # D) training and evaluating rf model
 
@@ -452,15 +459,15 @@ auc(roc_obj)
 library(keras3)
 
 model <- keras_model_sequential() |>
-  layer_dense(16, activation = "relu", input_shape = c(ncol(edge_features))) |>
-  layer_dense(8, activation = "relu") |>
-  layer_dropout(0.2) |>
+  layer_dense(32, activation = "relu", input_shape = c(ncol(edge_features))) |>
+  layer_dense(16, activation = "relu") |>
+  layer_dropout(0.5) |>
   layer_dense(1, activation = "sigmoid")
 
 model |> compile(
   loss = "binary_crossentropy",
-  optimizer = optimizer_adam(learning_rate = 0.001),
-  metrics = list("accuracy", metric_auc())
+  optimizer = "adam",
+  metrics = list("accuracy", "AUC")
 )
 
 # b. training DL model
@@ -468,12 +475,9 @@ history <- model |> fit(
   x_train,
   y_train,
   validation_data = list(x_val, y_val),
-  epochs = 10,
-  batch_size = 32,
-  callbacks = list(
-    callback_early_stopping(patience = 5, restore_best_weights = TRUE)
+  epochs = 50,
+  batch_size = 32
   )
-)
 
 plot(history)
 
